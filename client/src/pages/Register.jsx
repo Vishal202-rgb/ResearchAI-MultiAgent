@@ -10,8 +10,8 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await register(formData);
-    if (success) navigate('/dashboard');
+    const result = await register(formData.name, formData.email, formData.password);
+    if (result.success) navigate('/dashboard');
   };
 
   return (

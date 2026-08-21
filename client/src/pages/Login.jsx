@@ -10,8 +10,8 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await login(formData.email, formData.password);
-    if (success) navigate('/dashboard');
+    const result = await login(formData.email, formData.password);
+    if (result.success) navigate('/dashboard');
   };
 
   return (
