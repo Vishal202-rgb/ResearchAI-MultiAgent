@@ -5,7 +5,6 @@ import Source from '../models/Source.js';
 import ResearchRun from '../models/ResearchRun.js';
 import AppError from '../utils/AppError.js';
 import { generateReportContent } from '../services/report/reportService.js';
-import pdf from 'html-pdf-node';
 import { marked } from 'marked';
 
 export const generateReport = async (req, res, next) => {
@@ -87,6 +86,9 @@ export const exportReportPDF = async (req, res, next) => {
 
     const file = { content: htmlContent };
     const options = { format: 'A4', margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' } };
+
+    // Dynamically import to avoid Puppeteer/Vercel serverless limits on cold start
+    const pdf = (await import('html-pdf-node')).default;
 
     pdf.generatePdf(file, options).then(pdfBuffer => {
       res.setHeader('Content-Type', 'application/pdf');

@@ -1,5 +1,4 @@
 import fs from 'fs';
-import { PDFParse } from 'pdf-parse';
 
 import Document from '../../models/Document.js';
 import { getPineconeIndex } from './pineconeClient.js';
@@ -80,6 +79,10 @@ export const processDocument = async (documentId) => {
 
     if (isPDF) {
       console.log('Processing PDF document...');
+
+      // Dynamically import to avoid Vercel crashing during module initialization
+      const pdfParseModule = await import('pdf-parse');
+      const PDFParse = pdfParseModule.PDFParse || pdfParseModule.default;
 
       const parser = new PDFParse({
         data: dataBuffer,
