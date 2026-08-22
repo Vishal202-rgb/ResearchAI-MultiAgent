@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { chatService } from '../services/featuresService.js';
-import { Send, Loader2, Bot, User, BookOpen } from 'lucide-react';
+import { Send, Loader2, Bot, User, BookOpen, MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+const SUGGESTED_QUESTIONS = [
+  "What are the main findings?",
+  "What are the key benefits and risks?",
+  "What relationships exist between the entities?",
+  "What do the sources say about this topic?",
+  "What are the most important conclusions?"
+];
 
 const ChatPanel = ({ workspaceId }) => {
   const [messages, setMessages] = useState([]);
@@ -27,11 +35,16 @@ const ChatPanel = ({ workspaceId }) => {
     }
   };
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const handleSend = async (textOrEvent) => {
+    if (textOrEvent?.preventDefault) {
+      textOrEvent.preventDefault();
+    }
+    
+    const textToSend = typeof textOrEvent === 'string' ? textOrEvent : input;
+    
+    if (!textToSend.trim() || loading) return;
 
-    const userMessage = { role: 'user', content: input, _id: Date.now() };
+    const userMessage = { role: 'user', content: textToSend, _id: Date.now() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
@@ -53,16 +66,35 @@ const ChatPanel = ({ workspaceId }) => {
           <Bot className="w-4 h-4 text-gray-500" />
           Research Assistant
         </h3>
-        <p className="text-xs text-gray-500 mt-1 pl-6">Ask questions about your research findings and documents.</p>
+        <p className="text-xs text-gray-500 mt-1 pl-6">Ask questions about your research findings, documents, graph, and web sources.</p>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-20 text-sm">
-            <Bot className="w-8 h-8 mx-auto text-gray-300 dark:text-gray-700 mb-3" />
-            No messages yet. Ask me to summarize findings or search documents.
+          <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto mt-8">
+            <div className="w-12 h-12 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-full flex items-center justify-center mb-4">
+              <MessageSquare className="w-6 h-6 text-gray-400" />
+            </div>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">How can I help you?</h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">
+              I can analyze your workspace documents, synthesize web sources, or query the knowledge graph.
+            </p>
+            
+            <div className="w-full space-y-2">
+              {SUGGESTED_QUESTIONS.map((q, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSend(q)}
+                  disabled={loading}
+                  className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 dark:bg-[#1a1a1a] dark:hover:bg-[#222] border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-700 dark:text-gray-300 transition-colors shadow-sm"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         )}
+        
         {messages.map((msg, idx) => (
           <div key={msg._id || idx} className={`flex gap-3 max-w-[90%] md:max-w-[80%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''}`}>
             <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === 'user' ? 'bg-gray-900 dark:bg-white' : 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700'}`}>

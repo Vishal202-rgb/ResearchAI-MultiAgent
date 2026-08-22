@@ -37,8 +37,25 @@ const ReportPanel = ({ workspaceId }) => {
     }
   };
 
-  const handleExport = () => {
-    window.open(reportService.exportPdfUrl(workspaceId), '_blank');
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const response = await reportService.exportPdf(workspaceId);
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `research_report_${workspaceId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -62,10 +79,11 @@ const ReportPanel = ({ workspaceId }) => {
           {report && (
             <button 
               onClick={handleExport}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-xs font-medium rounded-lg transition-colors shadow-sm"
+              disabled={exporting}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 disabled:opacity-50 text-xs font-medium rounded-lg transition-colors shadow-sm"
             >
-              <Download className="w-3.5 h-3.5" />
-              Export PDF
+              {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              {exporting ? 'Exporting...' : 'Export PDF'}
             </button>
           )}
         </div>

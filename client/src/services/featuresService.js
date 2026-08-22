@@ -24,5 +24,5 @@ export const graphService = {
 export const reportService = {
   getReport: (workspaceId) => api.get(`/reports/${workspaceId}`),
   generateReport: (workspaceId) => api.post(`/reports/${workspaceId}/generate`),
-  exportPdfUrl: (workspaceId) => `${api.defaults.baseURL}/reports/${workspaceId}/export/pdf`,
+  exportPdf: (workspaceId) => api.get(`/reports/${workspaceId}/export/pdf`, { responseType: 'blob' }),
 };
