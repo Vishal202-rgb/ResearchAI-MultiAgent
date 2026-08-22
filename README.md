@@ -1,137 +1,104 @@
-뿯붿# ResearchAI - Multi-Agent Research Workspace
+# ResearchAI — Multi-Agent Research Workspace
 
-A production-grade, AI-powered multi-agent research workspace built with the MERN stack. ResearchAI orchestrates a swarm of specialized autonomous agents (Planner, Researcher, Analyst, Fact-Checker, Synthesizer) to perform deep web research, document analysis via RAG, and automated synthesis.
+> An AI-powered research platform that orchestrates multiple specialized agents to perform deep web research, document analysis, knowledge extraction, and automated report synthesis.
 
-## Features
+ResearchAI is a production-oriented MERN application designed to turn a research question into a structured, evidence-backed research report.
 
-- **Multi-Agent Orchestration**: A structured AI pipeline that delegates complex research tasks to specialized agents (Planner, Researcher, Analyst, Fact Checker, Synthesizer).
-- **RAG & Document Chat**: Upload PDF/TXT documents. Uses Pinecone vector embeddings to chat with your documents contextually.
-- **Tavily Web Search Integration**: Real-time web search integration to ground AI responses in real, verifiable facts and provide clickable source citations.
-- **Knowledge Graph**: Interactive 2D HTML5 Canvas graph powered by Neo4j and eact-force-graph-2d visualizing relationships between research entities and topics.
-- **Deep Dive**: Select any specific finding and launch targeted follow-up research for evidence validation, opposing views, and latest sources.
-- **Research Comparison**: Compare two different workspaces side-by-side to highlight similarities, differences, and conflicting findings.
-- **Research Timeline**: Automatically extracts dates from verified sources to construct a chronological timeline of research events.
-- **Global Search**: Search across workspaces and research content seamlessly.
-- **PDF Export**: Securely export comprehensive research reports to PDF.
-- **Static Demo Workspaces**: Try out pre-compiled research demos instantly without executing expensive API calls.
+## 🚀 Features
 
-## Architecture & Tech Stack
+### 🤖 Multi-Agent Research
+A coordinated AI pipeline consisting of specialized agents:
 
-### Frontend
-- **React + Vite** - High-performance UI
-- **Tailwind CSS** - Modern, responsive styling (Dark/Light mode support)
-- **Zustand** - Lightweight global state management
-- **React Router** - Client-side navigation
-- **react-force-graph-2d** - HTML5 Canvas graph visualization
-- **Lucide React** - SVG Icons
+- Planner — breaks the research question into actionable tasks
+- Researcher — discovers relevant web sources
+- Analyst — analyzes collected evidence
+- Fact Checker — validates claims and sources
+- Synthesizer — generates the final research output
 
-### Backend & AI
-- **Node.js + Express.js** - Robust REST API
-- **MongoDB + Mongoose** - Document storage for workspaces, users, and reports
-- **Neo4j** - Graph database for storing entity relationships
-- **Pinecone** - Vector database for RAG document embeddings
-- **Google Gemini (AI Studio)** - Core LLM powering the autonomous agents
-- **Tavily API** - Real-time AI web search engine
-- **JWT + bcryptjs** - Secure authentication
+### 🔎 Real-Time Web Research
+- Tavily-powered web search
+- Verified source URLs
+- Source snippets and publishers
+- Evidence-backed findings
+- Clickable references
 
-## Folder Structure
+### 📚 Documents & RAG
+- Upload PDF/TXT documents
+- Extract and chunk document content
+- Generate vector embeddings
+- Store embeddings in Pinecone
+- Context-aware document chat
 
-\\\
-multi-agent-research-workspace/
-├── client/
-│   ├── src/
-│   │   ├── components/       # Reusable UI components (GraphPanel, DeepDive, etc.)
-│   │   ├── pages/            # Page components (Dashboard, WorkspaceDetails, CompareWorkspaces)
-│   │   ├── services/         # API service layer
-│   │   ├── store/            # Zustand state management
-│   │   ├── App.jsx           # Root component
-│   │   └── main.jsx          # Entry point
-│   └── package.json
-│
-├── server/
-│   ├── config/               # DB connections (Mongo, Neo4j, Pinecone)
-│   ├── controllers/          # API Route controllers
-│   ├── middleware/           # Auth, Upload, Error handling
-│   ├── models/               # Mongoose schemas
-│   ├── routes/               # Express routes
-│   ├── services/             # Core Logic
-│   │   ├── agents/           # Planner, Researcher, Analyst, etc.
-│   │   ├── ai/               # Gemini Service
-│   │   ├── rag/              # Retrieval, Pinecone embeddings, Web Search
-│   │   └── chat/             # Chat prompt contextualization
-│   ├── app.js                # Express app setup
-│   ├── server.js             # Server entry point
-│   └── package.json
-\\\
+### 🧠 Knowledge Graph
+- Neo4j-powered knowledge graph
+- Extract entities and relationships from research
+- Interactive 2D graph visualization
+- Explore connections between topics and findings
 
-## Installation & Setup
+### 🔬 Deep Dive Research
+Select an individual finding and perform targeted follow-up research to:
 
-### Prerequisites
-- Node.js v18+
-- MongoDB (local or Atlas)
-- Neo4j (AuraDB or local)
-- Pinecone Account
-- Google Gemini API Key
-- Tavily API Key
+- Validate evidence
+- Find supporting sources
+- Discover opposing viewpoints
+- Find recent information
 
-### 1. Clone & Install
+### ⚖️ Research Comparison
+Compare two research workspaces and generate:
 
-\\\ash
-git clone <repository-url>
-cd multi-agent-research-workspace
+- Similarities
+- Differences
+- Conflicting findings
+- AI-generated comparative analysis
 
-# Install backend dependencies
-cd server
-npm install
+### ⏳ Research Timeline
+Automatically extracts dates from research sources and presents important events in chronological order.
 
-# Install frontend dependencies
-cd ../client
-npm install
-\\\
+### 💬 Research Chat
+Ask questions about your completed research and get contextual answers based on the workspace findings.
 
-### 2. Environment Variables
+### 🌐 Global Search
+Search across research workspaces and quickly find relevant research content.
 
-Create a \server/.env\ file based on \.env.example\:
+### 📄 PDF Export
+Export completed research into a structured PDF report.
 
-\\\env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/research-workspace
-JWT_SECRET=your_secure_random_secret_key
-JWT_EXPIRES_IN=7d
-CLIENT_URL=http://localhost:5173
-NODE_ENV=development
+### 🎯 Static Demo Workspaces
+Explore pre-built research demonstrations without consuming API credits.
 
-# AI APIs
-GEMINI_API_KEY=your_gemini_api_key
-SEARCH_API_KEY=your_tavily_api_key
+---
 
-# Vector DB
-PINECONE_API_KEY=your_pinecone_api_key
-PINECONE_INDEX=your_index_name
-PINECONE_ENVIRONMENT=us-east-1
+## 🏗️ Architecture
 
-# Graph DB
-NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password
-\\\
-
-## Running the Application
-
-\\\ash
-# Start backend (from /server)
-npm run dev
-
-# Start frontend (from /client)
-npm run dev
-\\\
-
-## Deployment (Vercel)
-
-The backend is fully adapted for serverless execution on Vercel:
-- File uploads use \os.tmpdir()\ (\/tmp\) to comply with serverless read-only filesystems.
-- Background jobs are explicitly \wait\ed to prevent premature Lambda termination.
-
-## License
-
-MIT
+```text
+                    ┌─────────────────────┐
+                    │     React + Vite    │
+                    │      Frontend       │
+                    └──────────┬──────────┘
+                               │
+                         REST API / HTTP
+                               │
+                    ┌──────────▼──────────┐
+                    │   Node.js + Express │
+                    │      Backend        │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+        ┌──────────┐      ┌──────────┐    ┌──────────┐
+        │ MongoDB  │      │  Neo4j   │    │ Pinecone │
+        │ Database │      │  Graph   │    │ Vector DB│
+        └──────────┘      └──────────┘    └──────────┘
+              │                │                │
+              └────────────────┼────────────────┘
+                               │
+                     ┌─────────▼─────────┐
+                     │   AI / Agents     │
+                     │      Gemini       │
+                     └─────────┬─────────┘
+                               │
+                     ┌─────────▼─────────┐
+                     │   Tavily Search   │
+                     │   Web Research    │
+                     └───────────────────┘
