@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Workspaces from './pages/Workspaces.jsx';
 import CreateWorkspace from './pages/CreateWorkspace.jsx';
 import WorkspaceDetails from './pages/WorkspaceDetails.jsx';
+import DemoWorkspace from './pages/DemoWorkspace.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import useAuthStore from './store/authStore.js';
 
@@ -65,6 +66,14 @@ function App() {
         element={
           <ProtectedRoute>
             <WorkspaceDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/demo/:id"
+        element={
+          <ProtectedRoute>
+            <DemoWorkspace />
           </ProtectedRoute>
         }
       />

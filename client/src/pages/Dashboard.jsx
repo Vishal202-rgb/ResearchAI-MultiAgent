@@ -6,6 +6,8 @@ import useAuthStore from '../store/authStore.js';
 import WorkspaceForm from '../components/WorkspaceForm.jsx';
 import Navbar from '../components/Navbar.jsx';
 
+import { DemoWorkspaces } from '../components/DemoWorkspaces.jsx';
+
 const statusStyles = {
   draft: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400',
   active: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-400',
@@ -66,11 +68,17 @@ const Dashboard = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search workspaces..."
+            placeholder="Search your workspaces..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white text-sm rounded-lg py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white transition-all shadow-sm"
           />
+        </div>
+
+        <DemoWorkspaces />
+
+        <div className="mt-12 mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Your Workspaces</h2>
         </div>
 
         {loading ? (

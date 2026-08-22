@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, X, Loader2, Target, HelpCircle, 
   ListChecks, AlertCircle, RefreshCw, Play, CheckCircle2, Circle, 
-  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain
+  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity
 } from 'lucide-react';
 import useWorkspaceStore from '../store/workspaceStore.js';
 import useAuthStore from '../store/authStore.js';
@@ -170,7 +170,7 @@ const WorkspaceDetails = () => {
       <Navbar />
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-8">
-        <Link to="/workspaces" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-6 transition-colors">
+        <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Workspaces
         </Link>
 
@@ -208,7 +208,12 @@ const WorkspaceDetails = () => {
         )}
 
         <div className="mb-8">
-          <WorkspaceStats stats={{ documents: sources?.length || 0, sources: sources?.length || 0, findings: results?.keyFindings?.length || 0, researchRuns: runs?.length || (hasPlan ? 1 : 0) }} />
+          <WorkspaceStats stats={{ 
+            documents: sources ? sources.filter(s => s.url && s.url.startsWith('http')).length : 0, 
+            sources: sources ? sources.filter(s => s.url && s.url.startsWith('http')).length : 0, 
+            findings: results?.keyFindings?.length || 0, 
+            researchRuns: runs?.length || (hasPlan ? 1 : 0) 
+          }} />
         </div>
 
         {/* Tab Navigation */}
@@ -285,18 +290,39 @@ const WorkspaceDetails = () => {
                 <div className="space-y-6">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" /> Overview & Findings
+                      <Sparkles className="w-5 h-5" /> Detailed Research Report
                     </h2>
                     <button onClick={handleExecuteResearch} className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
                       <RefreshCw className="w-3.5 h-3.5" /> Run Again
                     </button>
                   </div>
-                  
+
                   <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
                     <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">Executive Summary</h3>
                     <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{results.summary}</p>
                   </div>
-                  
+
+                  {results.keyFindings && results.keyFindings.length > 0 && (
+                    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Key Findings</h3>
+                      <ul className="space-y-3">
+                        {results.keyFindings.map((finding, i) => (
+                          <li key={i} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center text-[10px] font-bold mt-0.5">{i + 1}</span>
+                            <span className="leading-relaxed">{finding}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {results.rawAnalysis && (
+                    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">Detailed Analysis</h3>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{results.rawAnalysis}</p>
+                    </div>
+                  )}
+
                   {results.claims && results.claims.length > 0 && (
                     <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
                       <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Fact-Checked Evidence</h3>
@@ -319,34 +345,54 @@ const WorkspaceDetails = () => {
                     </div>
                   )}
                   
-                  {sources && sources.length > 0 && (
+                  {sources && (
+                    sources.filter(s => s.url && s.url.startsWith('http')).length > 0 ? (
+                      <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Web Sources / References</h3>
+                        <div className="space-y-4">
+                          {sources.filter(s => s.url && s.url.startsWith('http')).map((s, i) => (
+                            <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="block p-4 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800/50 transition-colors">
+                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-200 line-clamp-1 mb-1">{s.title}</h4>
+                              <p className="text-xs text-gray-500 mb-2 truncate">{s.publisher} • {s.url}</p>
+                              {s.snippet && (
+                                <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2 border-l-2 border-gray-300 dark:border-gray-700 pl-2 ml-1">{s.snippet}</p>
+                              )}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Web Sources / References</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No web sources were found or retrieved for this research run.</p>
+                      </div>
+                    )
+                  )}
+
+                  {run && run.status === 'completed' && (
                     <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
-                      <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Web Sources</h3>
-                      <div className="space-y-3">
-                        {sources.map((s, i) => {
-                          const isValidLink = s.url && !s.isSimulated && s.url.startsWith('http');
-                          
-                          if (isValidLink) {
-                            return (
-                              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="block p-3 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800/50 transition-colors">
-                                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-200 line-clamp-1">{s.title}</h4>
-                                <p className="text-xs text-gray-500 mt-1">{s.publisher} • {s.url}</p>
-                              </a>
-                            );
-                          } else {
-                            return (
-                              <div key={i} className="block p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800/50 transition-colors">
-                                <div className="flex justify-between items-start gap-2">
-                                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-200 line-clamp-1">{s.title}</h4>
-                                  <span className="px-2 py-0.5 border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 text-[10px] uppercase font-semibold rounded text-amber-600 dark:text-amber-400 shrink-0">
-                                    Simulated
-                                  </span>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">{s.publisher} • (URL Unavailable)</p>
-                              </div>
-                            );
-                          }
-                        })}
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Research Metadata</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="block text-gray-500 dark:text-gray-400 text-xs uppercase font-medium mb-1">Status</span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">Completed</span>
+                        </div>
+                        <div>
+                          <span className="block text-gray-500 dark:text-gray-400 text-xs uppercase font-medium mb-1">Completion Date</span>
+                          <span className="text-gray-900 dark:text-gray-200">{new Date(run.completedAt || run.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div>
+                          <span className="block text-gray-500 dark:text-gray-400 text-xs uppercase font-medium mb-1">Duration</span>
+                          <span className="text-gray-900 dark:text-gray-200">
+                            {run.startedAt && run.completedAt 
+                              ? `${Math.round((new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 1000)} seconds` 
+                              : 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-gray-500 dark:text-gray-400 text-xs uppercase font-medium mb-1">Sources Analyzed</span>
+                          <span className="text-gray-900 dark:text-gray-200">{sources ? sources.filter(s => s.url && s.url.startsWith('http')).length : 0}</span>
+                        </div>
                       </div>
                     </div>
                   )}

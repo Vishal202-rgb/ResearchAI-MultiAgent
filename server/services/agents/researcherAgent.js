@@ -16,89 +16,51 @@ const runResearcherAgent = async (tasks, researchQuestion, context = {}) => {
   const isSimulated = !(process.env.SEARCH_API_KEY && process.env.SEARCH_API_URL);
 
   if (!isSimulated) {
-    // Real Search - run serially/controlled to avoid blasting the search API
-    for (const task of researcherTasks) {
-      const searchQuery = `${researchQuestion} ${task.title}`;
-      const results = await searchWeb(searchQuery);
-      if (results) {
-        allSources.push(...results.map(s => ({ ...s, taskTitle: task.title })));
-      }
-    }
+    // Real Search - Run independently in parallel, limit to top 3 per task
+    const uniqueQueries = new Set();
+    const searchPromises = researcherTasks
+      .map(task => {
+        // Optimize: avoid duplicate queries
+        const searchQuery = `${researchQuestion} ${task.title}`;
+        if (uniqueQueries.has(searchQuery.toLowerCase())) return null;
+        uniqueQueries.add(searchQuery.toLowerCase());
+        
+        return searchWeb(searchQuery).then(results => 
+          (results || []).slice(0, 3).map(s => ({ ...s, taskTitle: task.title }))
+        ).catch(err => {
+          console.error(`Search failed for "${searchQuery}":`, err.message);
+          return []; // Graceful fallback
+        });
+      })
+      .filter(Boolean); // Remove nulls (duplicates)
+
+    const searchResults = await Promise.all(searchPromises);
+    allSources = searchResults.flat();
   } else {
-    // Simulated Search - BATCHED into ONE Gemini API call instead of N calls!
-    const taskDescriptions = researcherTasks.map(t => `- Task: "${t.title}": ${t.description}`).join('\n');
-    
-    const simulatedPrompt = `You are a web research agent. Generate realistic web sources for ALL the following tasks in one go.
-    
-    RESEARCH QUESTION: "${researchQuestion}"
-    ${context.domain ? `DOMAIN: ${context.domain}` : ''}
-    
-    TASKS:
-    ${taskDescriptions}
+    console.warn('Search API not configured. Simulated web searches are disabled to prevent URL hallucinations.');
+    // allSources remains empty, guaranteeing we only use verified real sources.
+  }
 
-    IMPORTANT: Do NOT invent fake or hallucinatory URLs. Set "url" to an empty string "".
+  // 2. Strict filtering and Deduplication
+  const uniqueSources = [];
+  const seenIdentifiers = new Set();
+  
+  for (const s of allSources) {
+    // Ensure the source has a valid, real URL. No simulated/hallucinated URLs allowed.
+    if (!s.url || !s.url.startsWith('http')) continue;
 
-    Return JSON format:
-    {
-      "sources": [
-        {
-          "taskTitle": "Must exactly match one of the task titles above",
-          "title": "Article title",
-          "url": "",
-          "publisher": "Publisher name",
-          "publishedDate": "2024-01-15",
-          "snippet": "Brief excerpt",
-          "content": "Detailed content",
-          "relevanceScore": 0.85
-        }
-      ]
-    }`;
-
-    try {
-      // Retries are handled implicitly by geminiService backoff
-      const simulated = await callGemini(simulatedPrompt, { temperature: 0.6, maxTokens: 4000 });
-      allSources = (simulated.sources || []).map((s) => ({
-        ...s,
-        isSimulated: true,
-        relevanceScore: Math.min(1, Math.max(0, s.relevanceScore || 0.5)),
-      }));
-    } catch (err) {
-      console.error(`Batched simulated search failed:`, err.message);
+    const identifier = (s.url).toLowerCase().trim();
+    if (identifier && !seenIdentifiers.has(identifier)) {
+      seenIdentifiers.add(identifier);
+      uniqueSources.push(s);
     }
   }
 
-  // 2. Extraction - BATCHED into ONE Gemini API call for all tasks
-  if (allSources.length > 0) {
-    // Limit to 12 sources to avoid massive context and token limits
-    const sourcesToExtract = allSources.slice(0, 12); 
-    
-    const extractPrompt = `Analyze the following sources and extract key information per task.
+  // Optimization: Skip redundant extraction step. 
+  // Analyst Agent will extract and analyze directly from the sources to save 1 full API call and reduce latency.
+  const finalSources = uniqueSources.slice(0, 12);
 
-    RESEARCH QUESTION: "${researchQuestion}"
-
-    SOURCES:
-    ${sourcesToExtract.map((s, i) => `[${i + 1}] Task: ${s.taskTitle} | Title: ${s.title}\n${s.content || s.snippet}`).join('\n\n')}
-
-    Return JSON:
-    {
-      "extractions": [
-        {
-          "taskTitle": "exact task title mapped to the source",
-          "keyPoints": ["point 1", "point 2"],
-          "relevantData": "Summary of relevant data"
-        }
-      ]
-    }`;
-
-    try {
-      const extracted = await callGemini(extractPrompt, { temperature: 0.3, maxTokens: 4000 });
-      allRawData = extracted.extractions || [];
-    } catch (err) {
-      console.error('Batched extraction failed:', err.message);
-    }
-  }
-
-  return { sources: allSources, rawData: allRawData };
+  return { sources: finalSources, rawData: [] };
 };
 
 export default runResearcherAgent;

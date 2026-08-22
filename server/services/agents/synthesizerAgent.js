@@ -4,9 +4,11 @@ import callGemini from '../ai/geminiService.js';
  * Synthesizer Agent — combines all agent results into final research findings.
  */
 const runSynthesizerAgent = async (researchQuestion, sources, analysis, factCheckResult, context = {}) => {
-  const sourceList = sources.slice(0, 15).map((s, i) =>
-    `[${i + 1}] "${s.title}" — ${s.publisher || 'Unknown'}`
-  ).join('\n');
+  const hasSources = sources && sources.length > 0;
+  
+  const sourceList = hasSources 
+    ? sources.slice(0, 15).map((s, i) => `[${i + 1}] "${s.title}" — ${s.publisher || 'Unknown'}${s.url ? ` (${s.url})` : ''}`).join('\n')
+    : 'NO SOURCES WERE RETRIEVED. Do not generate citations.';
 
   const prompt = `You are an expert research synthesizer. Combine all research results into a comprehensive final report.
 
@@ -31,8 +33,8 @@ Synthesize everything into JSON:
 {
   "summary": "A comprehensive executive summary (3-5 paragraphs) answering the research question",
   "keyFindings": [
-    "Key finding 1 with source reference",
-    "Key finding 2 with source reference"
+    ${hasSources ? '"Key finding 1 [Source 1]"' : '"Key finding 1 (No citations available)"'},
+    ${hasSources ? '"Key finding 2 [Source 2]"' : '"Key finding 2 (No citations available)"'}
   ],
   "insights": [
     "Novel insight or implication derived from the research"
@@ -48,7 +50,7 @@ RULES:
 - Include 4-8 key findings
 - Include 2-5 insights
 - Include 2-4 limitations
-- Reference source numbers where appropriate
+${hasSources ? '- Reference source numbers like [Source 1] where appropriate based ONLY on the SOURCES USED list.' : '- NO SOURCES EXIST. DO NOT GENERATE ANY CITATIONS OR REFERENCES (e.g., do not write [Source 1]). State clearly that no web sources were provided.'}
 - Be objective and balanced
 
 Return ONLY valid JSON.`;

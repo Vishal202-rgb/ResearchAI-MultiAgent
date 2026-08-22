@@ -6,25 +6,22 @@ import callGemini from '../ai/geminiService.js';
  * while returning structurally separated objects to maintain the agent architecture.
  */
 const runAnalystAgent = async (researchQuestion, sources, rawData, context = {}) => {
-  const sourceSummary = sources.slice(0, 12).map((s, i) =>
-    `[${i + 1}] ${s.title} (${s.publisher || 'Unknown'})\n   ${s.content || s.snippet || 'No content'}`
-  ).join('\n\n');
-
-  const dataPoints = rawData.map((d) =>
-    `Task: ${d.taskTitle}\nKey Points: ${(d.keyPoints || []).join('; ')}\nData: ${d.relevantData || 'N/A'}`
-  ).join('\n\n');
+  const hasSources = sources && sources.length > 0;
+  
+  const sourceSummary = hasSources 
+    ? sources.slice(0, 12).map((s, i) =>
+        `[${i + 1}] ${s.title} (${s.publisher || 'Unknown'})\nURL: ${s.url}\nContent: ${s.content || s.snippet || 'No content'}`
+      ).join('\n\n')
+    : 'No sources available. State that no sources were provided.';
 
   const prompt = `You are a dual-role expert: Research Analyst AND Fact-Checker. 
-  Analyze the research data to find patterns/insights, AND immediately verify the core claims against the provided sources.
+  Analyze the provided sources to find patterns/insights, AND immediately verify the core claims against these sources.
 
   RESEARCH QUESTION: "${researchQuestion}"
   ${context.objective ? `OBJECTIVE: ${context.objective}` : ''}
 
-  SOURCES:
+  SOURCES TO ANALYZE AND FACT-CHECK:
   ${sourceSummary || 'No sources available'}
-
-  RESEARCH DATA:
-  ${dataPoints || 'No extracted data available'}
 
   Return JSON:
   {
