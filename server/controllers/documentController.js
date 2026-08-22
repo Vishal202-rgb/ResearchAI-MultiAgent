@@ -1,19 +1,16 @@
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import Document from '../models/Document.js';
 import Workspace from '../models/Workspace.js';
 import AppError from '../utils/AppError.js';
 import { processDocument } from '../services/rag/documentProcessor.js';
 
-// Setup Multer storage
+// Setup Multer storage using OS temp directory for Vercel compatibility
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = 'uploads/';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    cb(null, os.tmpdir());
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`);
@@ -56,12 +53,20 @@ export const uploadDocument = async (req, res, next) => {
       status: 'pending'
     });
 
-    // Start background processing
-    processDocument(doc._id).catch(err => console.error('Doc process error:', err));
+    // Await background processing to ensure Vercel doesn't kill the lambda
+    try {
+      await processDocument(doc._id);
+    } catch (err) {
+      console.error('Doc process error:', err);
+      // We still return 201 because the document was created, but status will be 'failed' in DB
+    }
+
+    // Refetch the document to return the updated status (indexed or failed)
+    const updatedDoc = await Document.findById(doc._id);
 
     res.status(201).json({
       success: true,
-      data: { document: doc }
+      data: { document: updatedDoc }
     });
   } catch (error) {
     next(error);
