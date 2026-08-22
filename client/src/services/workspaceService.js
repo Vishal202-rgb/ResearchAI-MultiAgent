@@ -7,6 +7,7 @@ const workspaceService = {
   update: (id, data) => api.put(`/workspaces/${id}`, data),
   delete: (id) => api.delete(`/workspaces/${id}`),
   getStats: () => api.get('/workspaces/stats'),
+  globalSearch: (q) => api.get(`/workspaces/search?q=${encodeURIComponent(q)}`),
 };
 
 export default workspaceService;

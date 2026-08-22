@@ -225,32 +225,112 @@ export const getResults = async (req, res, next) => {
     }
 
     // Get the latest completed run
-    const run = await ResearchRun.findOne({
+    const runs = await ResearchRun.find({
       workspaceId,
       userId: req.user._id,
       status: 'completed',
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: 1 });
 
-    if (!run) {
+    if (runs.length === 0) {
       return res.status(200).json({
         success: true,
         data: { finding: null, sources: [], run: null },
       });
     }
 
-    const finding = await ResearchFinding.findOne({
-      workspaceId,
-      researchRunId: run._id,
-    });
+    const latestRun = runs[runs.length - 1];
 
-    const sources = await Source.find({
-      workspaceId,
-      researchRunId: run._id,
-    }).sort({ relevanceScore: -1 });
+    // Get ALL findings for the workspace
+    const allFindings = await ResearchFinding.find({ workspaceId }).sort({ createdAt: 1 });
+    let finding = null;
+
+    if (allFindings.length > 0) {
+      finding = allFindings[allFindings.length - 1].toObject();
+      
+      // If multiple runs exist, merge key findings and claims to preserve history
+      if (allFindings.length > 1) {
+        const mergedKeyFindings = new Set();
+        const mergedClaims = new Map();
+        
+        allFindings.forEach(f => {
+          (f.keyFindings || []).forEach(kf => mergedKeyFindings.add(kf));
+          (f.claims || []).forEach(c => {
+            mergedClaims.set(c.claim, c);
+          });
+        });
+        
+        finding.keyFindings = Array.from(mergedKeyFindings);
+        finding.claims = Array.from(mergedClaims.values());
+      }
+    }
+
+    // Get ALL sources for this workspace to preserve timeline history and avoid fake data
+    const allSources = await Source.find({ workspaceId }).sort({ relevanceScore: -1 });
+    
+    // Deduplicate sources by exact URL
+    const uniqueSourcesMap = new Map();
+    allSources.forEach(s => {
+      if (s.url && !uniqueSourcesMap.has(s.url)) {
+        uniqueSourcesMap.set(s.url, s);
+      }
+    });
+    
+    const sources = Array.from(uniqueSourcesMap.values());
 
     res.status(200).json({
       success: true,
-      data: { finding, sources, run },
+      data: { finding, sources, run: latestRun },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deepDive = async (req, res, next) => {
+  try {
+    const { workspaceId } = req.params;
+    const { finding } = req.body;
+
+    if (!finding) return next(new AppError('Finding text is required for deep dive', 400));
+
+    // Simple targeted research
+    const { default: searchWeb } = await import('../services/rag/searchService.js');
+    const { retrieveRelevantContext } = await import('../services/rag/retrievalService.js');
+    const { default: callGemini } = await import('../services/ai/geminiService.js');
+
+    // 1. Web search for latest sources
+    const searchResults = await searchWeb(finding, { maxResults: 3 });
+    const webContext = searchResults.map(s => `[${s.title}](${s.url}): ${s.snippet}`).join('\n');
+
+    // 2. RAG retrieval
+    const ragResults = await retrieveRelevantContext(finding, workspaceId, req.user._id, 3);
+    const docContext = ragResults.map(d => d.text).join('\n');
+
+    const prompt = `Perform a targeted deep dive on the following finding: "${finding}"
+
+WEB SOURCES (Latest):
+${webContext}
+
+DOCUMENT CONTEXT (RAG):
+${docContext}
+
+Synthesize a targeted deep dive report focusing on:
+1. Validating Evidence (What supports this?)
+2. Latest Sources (What is the most recent data?)
+3. Opposing Findings / Nuance (What contradicts or adds nuance?)
+
+Return JSON ONLY:
+{
+  "evidence": "Detailed validation text",
+  "latestSources": [{"title": "Source 1", "url": "URL"}],
+  "opposingFindings": "Contradictions or nuances"
+}`;
+
+    const result = await callGemini(prompt, { temperature: 0.3 });
+
+    res.status(200).json({
+      success: true,
+      data: { deepDive: result }
     });
   } catch (error) {
     next(error);

@@ -22,6 +22,10 @@ const Dashboard = () => {
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [searchedQuery, setSearchedQuery] = useState('');
+
   useEffect(() => {
     fetchWorkspaces();
   }, [fetchWorkspaces]);
@@ -31,6 +35,34 @@ const Dashboard = () => {
     await createWorkspace(data);
     setSubmitting(false);
     setShowCreate(false);
+  };
+
+  const handleSearch = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!search.trim()) {
+      setSearchResults(null);
+      setSearchedQuery('');
+      return;
+    }
+
+    setSearching(true);
+    setSearchedQuery(search);
+    try {
+      const workspaceService = (await import('../services/workspaceService.js')).default;
+      const res = await workspaceService.globalSearch(search);
+      setSearchResults(res.data.data.results);
+    } catch (err) {
+      console.error(err);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   const filtered = workspaces.filter((w) =>
@@ -48,13 +80,21 @@ const Dashboard = () => {
             <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Workspaces</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your research projects and agents.</p>
           </div>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-sm font-medium rounded-lg transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            New Workspace
-          </button>
+          <div className="flex gap-2">
+            <Link
+              to="/compare"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-900 dark:bg-[#111111] dark:hover:bg-[#1a1a1a] dark:text-white border border-gray-200 dark:border-gray-800 text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              Compare
+            </Link>
+            <button
+              onClick={() => setShowCreate(!showCreate)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-sm font-medium rounded-lg transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New Workspace
+            </button>
+          </div>
         </div>
 
         {showCreate && (
@@ -68,75 +108,128 @@ const Dashboard = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search your workspaces..."
+            placeholder="Search workspaces and research findings... (Press Enter)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white text-sm rounded-lg py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white transition-all shadow-sm"
+            onKeyDown={handleKeyDown}
+            className="w-full bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white text-sm rounded-lg py-2.5 pl-10 pr-24 focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white transition-all shadow-sm"
           />
+          <button
+            onClick={handleSearch}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300 rounded transition-colors"
+          >
+            Search
+          </button>
         </div>
 
-        <DemoWorkspaces />
-
-        <div className="mt-12 mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Your Workspaces</h2>
-        </div>
-
-        {loading ? (
+        {searching ? (
           <div className="flex justify-center py-12">
             <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
           </div>
-        ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((workspace) => (
-              <Link
-                key={workspace._id}
-                to={`/workspaces/${workspace._id}`}
-                className="group flex flex-col bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 rounded-xl p-5 transition-all shadow-sm hover:shadow-md"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-8 h-8 rounded bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-center shrink-0 text-gray-500">
-                    <Brain className="w-4 h-4" />
-                  </div>
-                  <span className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${statusStyles[workspace.status] || statusStyles.draft}`}>
-                    {workspace.status}
-                  </span>
-                </div>
-                
-                <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1 mb-1">
-                  {workspace.title}
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-4 flex-1">
-                  {workspace.description || 'No description provided.'}
-                </p>
-                
-                <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-100 dark:border-gray-800/50">
-                  <span>{new Date(workspace.updatedAt).toLocaleDateString()}</span>
-                  <div className="flex items-center gap-1 font-medium group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                    Open <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 px-4 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-[#111111] shadow-sm">
-            <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-center mb-4">
-              <Sparkles className="w-5 h-5 text-gray-400" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No workspaces found</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm">
-              {search ? 'Try adjusting your search terms.' : 'Create your first workspace to start researching with AI agents.'}
-            </p>
-            {!search && (
+        ) : searchResults ? (
+          <div className="mb-8 animate-in fade-in">
+            <div className="flex items-center justify-between mb-4 border-b border-gray-200 dark:border-gray-800 pb-4">
+              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Search Results for "{searchedQuery}"
+              </h2>
               <button
-                onClick={() => setShowCreate(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-sm font-medium rounded-lg transition-colors shadow-sm"
+                onClick={() => { setSearchResults(null); setSearch(''); }}
+                className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white"
               >
-                <Plus className="w-4 h-4" />
-                Create Workspace
+                Clear Search
               </button>
+            </div>
+
+            {searchResults.length > 0 ? (
+              <div className="space-y-3">
+                {searchResults.map((res) => (
+                  <Link
+                    key={res._id}
+                    to={res.url}
+                    className="block p-4 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 rounded-xl transition-all shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-2 mb-1 text-xs font-medium text-gray-500">
+                      <span className="uppercase tracking-wider px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">{res.type}</span>
+                    </div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{res.title}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{res.snippet}</p>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Search className="w-8 h-8 text-gray-400 mb-3" />
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">No results found</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">We couldn't find anything matching "{searchedQuery}".</p>
+              </div>
             )}
           </div>
+        ) : (
+          <>
+            <DemoWorkspaces />
+
+            <div className="mt-12 mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
+              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Your Workspaces</h2>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+              </div>
+            ) : filtered.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map((workspace) => (
+                  <Link
+                    key={workspace._id}
+                    to={`/workspaces/${workspace._id}`}
+                    className="group flex flex-col bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 rounded-xl p-5 transition-all shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="w-8 h-8 rounded bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-center shrink-0 text-gray-500">
+                        <Brain className="w-4 h-4" />
+                      </div>
+                      <span className={`px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full border ${statusStyles[workspace.status] || statusStyles.draft}`}>
+                        {workspace.status}
+                      </span>
+                    </div>
+                    
+                    <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1 mb-1">
+                      {workspace.title}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-4 flex-1">
+                      {workspace.description || 'No description provided.'}
+                    </p>
+                    
+                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-100 dark:border-gray-800/50">
+                      <span>{new Date(workspace.updatedAt).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-1 font-medium group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                        Open <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 px-4 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-[#111111] shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-center mb-4">
+                  <Sparkles className="w-5 h-5 text-gray-400" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No workspaces found</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm">
+                  {search ? 'Try adjusting your search terms.' : 'Create your first workspace to start researching with AI agents.'}
+                </p>
+                {!search && (
+                  <button
+                    onClick={() => setShowCreate(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-sm font-medium rounded-lg transition-colors shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Workspace
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

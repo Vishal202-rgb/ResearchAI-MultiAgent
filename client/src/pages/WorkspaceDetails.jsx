@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, X, Loader2, Target, HelpCircle, 
   ListChecks, AlertCircle, RefreshCw, Play, CheckCircle2, Circle, 
-  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity
+  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock
 } from 'lucide-react';
 import useWorkspaceStore from '../store/workspaceStore.js';
 import useAuthStore from '../store/authStore.js';
@@ -17,6 +17,8 @@ import DocumentPanel from '../components/DocumentPanel.jsx';
 import GraphPanel from '../components/GraphPanel.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import ReportPanel from '../components/ReportPanel.jsx';
+import TimelinePanel from '../components/TimelinePanel.jsx';
+import DeepDive from '../components/DeepDive.jsx';
 
 const statusStyles = {
   draft: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400',
@@ -35,6 +37,7 @@ const agentTypeLabels = {
 
 const Tabs = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'timeline', label: 'Timeline', icon: Clock },
   { id: 'documents', label: 'Documents & RAG', icon: FileUp },
   { id: 'graph', label: 'Knowledge Graph', icon: Network },
   { id: 'chat', label: 'Research Chat', icon: MessageSquare },
@@ -239,6 +242,7 @@ const WorkspaceDetails = () => {
           {activeTab === 'graph' && <GraphPanel workspaceId={id} />}
           {activeTab === 'chat' && <ChatPanel workspaceId={id} />}
           {activeTab === 'report' && <ReportPanel workspaceId={id} />}
+          {activeTab === 'timeline' && <TimelinePanel sources={sources} />}
           
           {activeTab === 'overview' && (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -305,11 +309,14 @@ const WorkspaceDetails = () => {
                   {results.keyFindings && results.keyFindings.length > 0 && (
                     <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
                       <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Key Findings</h3>
-                      <ul className="space-y-3">
+                      <ul className="space-y-6">
                         {results.keyFindings.map((finding, i) => (
                           <li key={i} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
                             <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center text-[10px] font-bold mt-0.5">{i + 1}</span>
-                            <span className="leading-relaxed">{finding}</span>
+                            <div className="flex-1">
+                              <span className="leading-relaxed block">{finding}</span>
+                              <DeepDive workspaceId={id} finding={finding} />
+                            </div>
                           </li>
                         ))}
                       </ul>

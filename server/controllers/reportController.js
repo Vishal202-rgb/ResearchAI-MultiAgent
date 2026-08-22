@@ -102,3 +102,52 @@ export const exportReportPDF = async (req, res, next) => {
     next(error);
   }
 };
+
+export const compareWorkspaces = async (req, res, next) => {
+  try {
+    const { ws1, ws2 } = req.query;
+    if (!ws1 || !ws2) return next(new AppError('Two workspace IDs are required', 400));
+
+    const { default: Workspace } = await import('../models/Workspace.js');
+
+    const [w1, w2] = await Promise.all([
+      Workspace.findOne({ _id: ws1, userId: req.user._id }),
+      Workspace.findOne({ _id: ws2, userId: req.user._id })
+    ]);
+
+    if (!w1 || !w2) return next(new AppError('One or both workspaces not found or unauthorized', 404));
+
+    const finding1 = await ResearchFinding.findOne({ workspaceId: ws1 }).sort({ createdAt: -1 }).populate('workspaceId', 'title');
+    const finding2 = await ResearchFinding.findOne({ workspaceId: ws2 }).sort({ createdAt: -1 }).populate('workspaceId', 'title');
+
+    if (!finding1 || !finding2) return next(new AppError('Research findings not found for one or both workspaces', 404));
+
+    const prompt = `Compare these two research workspaces and provide a detailed synthesis.
+
+Workspace 1: ${finding1.workspaceId.title}
+Summary: ${finding1.summary}
+Findings: ${(finding1.keyFindings || []).join('; ')}
+
+Workspace 2: ${finding2.workspaceId.title}
+Summary: ${finding2.summary}
+Findings: ${(finding2.keyFindings || []).join('; ')}
+
+Analyze them and return ONLY a JSON response in the following format. Do not use markdown blocks around the JSON.
+{
+  "similarities": ["point 1", "point 2"],
+  "differences": ["point 1", "point 2"],
+  "conflictingFindings": ["point 1"],
+  "conclusion": "Overall synthesis paragraph"
+}`;
+
+    const { default: callGemini } = await import('../services/ai/geminiService.js');
+    const result = await callGemini(prompt, { temperature: 0.2 });
+
+    res.status(200).json({
+      success: true,
+      data: { comparison: result, ws1Title: finding1.workspaceId.title, ws2Title: finding2.workspaceId.title }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
