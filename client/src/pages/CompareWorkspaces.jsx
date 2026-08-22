@@ -1,8 +1,88 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, GitCompare, Loader2, RefreshCw, AlertCircle, Sparkles, Search, Check, ChevronDown } from 'lucide-react';
+import { ArrowLeft, GitCompare, Loader2, RefreshCw, AlertCircle, Sparkles, Search, Check, ChevronDown, Info } from 'lucide-react';
 import useWorkspaceStore from '../store/workspaceStore.js';
 import Navbar from '../components/Navbar.jsx';
+
+const DEMO_COMPARISON = {
+  ws1Title: "Generative AI in Software Development",
+  ws2Title: "AI Applications in Healthcare",
+  comparison: {
+    similarities: [
+      "Both domains show significant productivity gains and workflow automation.",
+      "High reliance on robust data privacy and security measures.",
+      "Integration of AI requires upskilling of the current workforce."
+    ],
+    differences: [
+      "Software engineering AI focuses on code generation and bug detection, whereas healthcare AI focuses on diagnostics and patient care.",
+      "Healthcare AI faces much stricter regulatory compliance (HIPAA, FDA) compared to software development.",
+      "Software AI is primarily text-to-text, while healthcare heavily utilizes computer vision (medical imaging)."
+    ],
+    conflictingFindings: [
+      "While software engineering reports immediate ROI from AI tools (like Copilot), healthcare reports slower, long-term ROI due to rigorous clinical trials and integration hurdles."
+    ],
+    conclusion: "Although Generative AI is transforming both software development and healthcare by automating routine tasks, the pace and focus of adoption differ drastically. Software engineering rapidly integrates AI for direct productivity boosts in coding, facing minimal regulatory friction. In contrast, healthcare adopts AI cautiously, prioritizing diagnostic accuracy, patient safety, and strict regulatory compliance, leading to a slower but highly impactful transformation."
+  }
+};
+
+const ComparisonReport = ({ result, isDemo }) => (
+  <div className={`space-y-6 animate-in fade-in ${isDemo ? 'opacity-90' : ''}`}>
+    {isDemo && (
+      <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-xl border border-blue-200 dark:border-blue-800/50 mb-8 shadow-sm">
+        <Info className="w-5 h-5 shrink-0 mt-0.5" />
+        <p className="text-sm leading-relaxed">
+          <strong>Demo Comparison:</strong> You need at least two completed research workspaces to run a real comparison. 
+          Below is a static example of how ResearchAI synthesizes findings across different topics.
+        </p>
+      </div>
+    )}
+
+    {isDemo && (
+      <div className="flex flex-col md:flex-row items-center gap-4 bg-gray-50 dark:bg-[#151515] p-4 rounded-xl border border-gray-200 dark:border-gray-800 mb-6 text-center md:text-left shadow-sm">
+        <div className="flex-1 font-semibold text-gray-900 dark:text-white">{result.ws1Title}</div>
+        <div className="text-xs font-bold text-gray-400 bg-white dark:bg-[#1a1a1a] px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">VS</div>
+        <div className="flex-1 font-semibold text-gray-900 dark:text-white">{result.ws2Title}</div>
+      </div>
+    )}
+
+    <div className="grid md:grid-cols-2 gap-6">
+      <div className="bg-white dark:bg-[#111111] border border-green-200 dark:border-green-900/30 rounded-xl p-6 shadow-sm">
+        <h3 className="text-base font-semibold text-green-800 dark:text-green-400 mb-4 flex items-center gap-2">
+          <Sparkles className="w-4 h-4" /> Similarities
+        </h3>
+        <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          {(result.comparison.similarities || []).map((s, i) => <li key={i}>{s}</li>)}
+        </ul>
+      </div>
+      <div className="bg-white dark:bg-[#111111] border border-amber-200 dark:border-amber-900/30 rounded-xl p-6 shadow-sm">
+        <h3 className="text-base font-semibold text-amber-800 dark:text-amber-400 mb-4 flex items-center gap-2">
+          <GitCompare className="w-4 h-4" /> Differences
+        </h3>
+        <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          {(result.comparison.differences || []).map((d, i) => <li key={i}>{d}</li>)}
+        </ul>
+      </div>
+    </div>
+
+    {result.comparison.conflictingFindings && result.comparison.conflictingFindings.length > 0 && (
+      <div className="bg-white dark:bg-[#111111] border border-red-200 dark:border-red-900/30 rounded-xl p-6 shadow-sm">
+        <h3 className="text-base font-semibold text-red-800 dark:text-red-400 mb-4 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" /> Conflicting Findings
+        </h3>
+        <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          {result.comparison.conflictingFindings.map((c, i) => <li key={i}>{c}</li>)}
+        </ul>
+      </div>
+    )}
+
+    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
+      <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Synthesis & Conclusion</h3>
+      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+        {result.comparison.conclusion}
+      </p>
+    </div>
+  </div>
+);
 
 const WorkspaceCombobox = ({ label, value, onChange, workspaces, disabledId }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -128,6 +208,7 @@ const CompareWorkspaces = () => {
   };
 
   const completedWorkspaces = workspaces.filter(w => w.status === 'completed' || w.status === 'active');
+  const showDemo = completedWorkspaces.length < 2 && !result;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-[#0a0a0a]">
@@ -174,46 +255,8 @@ const CompareWorkspaces = () => {
           </button>
         </div>
 
-        {result && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-[#111111] border border-green-200 dark:border-green-900/30 rounded-xl p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-green-800 dark:text-green-400 mb-4 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" /> Similarities
-                </h3>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                  {(result.comparison.similarities || []).map((s, i) => <li key={i}>{s}</li>)}
-                </ul>
-              </div>
-              <div className="bg-white dark:bg-[#111111] border border-amber-200 dark:border-amber-900/30 rounded-xl p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-amber-800 dark:text-amber-400 mb-4 flex items-center gap-2">
-                  <GitCompare className="w-4 h-4" /> Differences
-                </h3>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                  {(result.comparison.differences || []).map((d, i) => <li key={i}>{d}</li>)}
-                </ul>
-              </div>
-            </div>
-
-            {result.comparison.conflictingFindings && result.comparison.conflictingFindings.length > 0 && (
-              <div className="bg-white dark:bg-[#111111] border border-red-200 dark:border-red-900/30 rounded-xl p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-red-800 dark:text-red-400 mb-4 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" /> Conflicting Findings
-                </h3>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                  {result.comparison.conflictingFindings.map((c, i) => <li key={i}>{c}</li>)}
-                </ul>
-              </div>
-            )}
-
-            <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Synthesis & Conclusion</h3>
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                {result.comparison.conclusion}
-              </p>
-            </div>
-          </div>
-        )}
+        {result && <ComparisonReport result={result} isDemo={false} />}
+        {showDemo && <ComparisonReport result={DEMO_COMPARISON} isDemo={true} />}
       </main>
     </div>
   );
