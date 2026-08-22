@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, X, Loader2, Target, HelpCircle, 
   ListChecks, AlertCircle, RefreshCw, Play, CheckCircle2, Circle, 
-  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock
+  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock, Bot
 } from 'lucide-react';
 import useWorkspaceStore from '../store/workspaceStore.js';
 import useAuthStore from '../store/authStore.js';
@@ -44,6 +44,96 @@ const Tabs = [
   { id: 'report', label: 'Final Report', icon: Download },
 ];
 
+const AutoRunOverlay = ({ generating, running, run, plan, error, onRetry, onClose }) => {
+  const steps = [
+    { id: 'create', label: 'Creating Workspace', status: 'completed' },
+    { id: 'plan', label: 'Planning', status: generating ? 'running' : (run || plan ? 'completed' : 'pending') },
+  ];
+  
+  const agents = ['researcher', 'analyst', 'fact_checker', 'synthesizer'];
+  agents.forEach(agent => {
+    let agentStatus = run?.agentStatuses?.find(s => s.agent === agent)?.status || 'pending';
+    if (!run && !running) agentStatus = 'pending';
+    steps.push({
+      id: agent,
+      label: agentTypeLabels[agent] || agent,
+      status: agentStatus
+    });
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-2xl bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-3xl p-10 md:p-16 shadow-2xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent animate-[shimmer_2s_infinite] pointer-events-none" />
+        <div className="relative z-10">
+          <div className="flex items-center justify-center mb-8">
+            <div className="w-16 h-16 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl flex items-center justify-center shadow-lg">
+              <Bot className="w-8 h-8" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-2">
+            AI Research in Progress
+          </h2>
+          <p className="text-center text-gray-500 dark:text-gray-400 mb-12">
+            Our multi-agent workflow is gathering and synthesizing your research.
+          </p>
+          
+          {error ? (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl p-4 text-center">
+              <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-2" />
+              <p className="text-sm text-red-700 dark:text-red-400 mb-4">{error}</p>
+              <div className="flex justify-center gap-3">
+                 <button onClick={onRetry} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg">Try Again</button>
+                 <button onClick={onClose} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-lg">View Workspace</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {steps.map((step, idx) => (
+                <div key={step.id} className={`flex items-center gap-4 transition-opacity duration-300 ${step.status === 'pending' ? 'opacity-40' : 'opacity-100'}`}>
+                  <div className="relative flex-shrink-0">
+                    {step.status === 'completed' && (
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center border border-emerald-200 dark:border-emerald-800 shadow-sm">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                    )}
+                    {step.status === 'failed' && (
+                      <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center border border-red-200 dark:border-red-800 shadow-sm">
+                        <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      </div>
+                    )}
+                    {step.status === 'running' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white flex items-center justify-center shadow-lg relative">
+                        <Loader2 className="w-5 h-5 text-white dark:text-gray-900 animate-spin" />
+                        <div className="absolute inset-0 rounded-full border-2 border-gray-900 dark:border-white animate-ping opacity-20"></div>
+                      </div>
+                    )}
+                    {step.status === 'pending' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                        <Circle className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                      </div>
+                    )}
+                    {idx < steps.length - 1 && (
+                      <div className={`absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-6 ${step.status === 'completed' ? 'bg-emerald-200 dark:bg-emerald-800/50' : 'bg-gray-200 dark:bg-gray-800'}`} />
+                    )}
+                  </div>
+                  <div className="flex items-center">
+                    <span className={`text-base font-semibold ${step.status === 'running' ? 'text-gray-900 dark:text-white' : step.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      {step.label}
+                    </span>
+                    {step.status === 'running' && <span className="ml-3 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full animate-pulse">Running</span>}
+                    {step.status === 'failed' && <span className="ml-3 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">Failed</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const WorkspaceDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -60,6 +150,10 @@ const WorkspaceDetails = () => {
   const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+  const [autoStartHandled, setAutoStartHandled] = useState(false);
+  const [showAutoRunOverlay, setShowAutoRunOverlay] = useState(false);
+  const [autoRunError, setAutoRunError] = useState(null);
 
   useEffect(() => {
     // Clear out stale state if we are loading a different workspace
@@ -90,10 +184,52 @@ const WorkspaceDetails = () => {
     
     return () => {
       isMounted = false;
-      // Intentionally NOT clearing store state here to avoid race conditions with React StrictMode / Fast Navigation
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Handle Auto-Start from Command Center
+  useEffect(() => {
+    if (location.state?.autoStart && !autoStartHandled && currentWorkspace && currentWorkspace._id === id) {
+      // Don't auto-start if there's already a plan or it's running
+      if (plan || generating || running || run) {
+        setAutoStartHandled(true);
+        return;
+      }
+
+      const runPipeline = async () => {
+        setAutoStartHandled(true);
+        setShowAutoRunOverlay(true);
+        
+        // 1. Generate Plan
+        const planResult = await generatePlan(id);
+        if (!planResult.success) {
+          setAutoRunError('Failed to generate research plan: ' + planResult.message);
+          return;
+        }
+        
+        // 2. Start Run
+        const runResult = await startRun(id);
+        if (!runResult.success) {
+          setAutoRunError('Failed to start research run: ' + runResult.message);
+          return;
+        }
+      };
+      
+      runPipeline();
+    }
+  }, [location.state, autoStartHandled, currentWorkspace, id, plan, generating, running, run, generatePlan, startRun]);
+
+  // Auto-close overlay when done, or show error on failure
+  useEffect(() => {
+    if (showAutoRunOverlay) {
+      if (run?.status === 'completed' && results) {
+        setShowAutoRunOverlay(false);
+      } else if (run?.status === 'failed') {
+        setAutoRunError('Research run failed during execution.');
+      }
+    }
+  }, [showAutoRunOverlay, run?.status, results]);
 
   useEffect(() => {
     let interval;
@@ -169,6 +305,26 @@ const WorkspaceDetails = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {showAutoRunOverlay && (
+        <AutoRunOverlay 
+          generating={generating}
+          running={running}
+          run={run}
+          plan={plan}
+          error={autoRunError}
+          onRetry={async () => {
+            setAutoRunError(null);
+            const planResult = await generatePlan(id);
+            if (planResult.success) {
+              const runResult = await startRun(id);
+              if (!runResult.success) setAutoRunError(runResult.message);
+            } else {
+              setAutoRunError(planResult.message);
+            }
+          }}
+          onClose={() => setShowAutoRunOverlay(false)}
+        />
+      )}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <Navbar />
 

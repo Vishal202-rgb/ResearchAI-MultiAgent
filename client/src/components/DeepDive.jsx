@@ -1,5 +1,43 @@
 import { useState } from 'react';
 import { Search, Loader2, Sparkles, Target, AlertCircle } from 'lucide-react';
+import api from '../services/api.js';
+
+const renderText = (content) => {
+  if (!content) return null;
+  
+  if (typeof content === 'string' || typeof content === 'number' || typeof content === 'boolean') {
+    return <p className="text-sm">{String(content)}</p>;
+  }
+  
+  if (Array.isArray(content)) {
+    return (
+      <ul className="list-disc pl-5 space-y-1 mt-1 text-sm">
+        {content.map((item, idx) => (
+          <li key={idx}>{renderText(item)}</li>
+        ))}
+      </ul>
+    );
+  }
+  
+  if (typeof content === 'object') {
+    return (
+      <div className="space-y-2 mt-1 text-sm">
+        {Object.entries(content).map(([key, val], idx) => (
+          <div key={idx} className="flex flex-col">
+            <span className="font-semibold text-gray-800 dark:text-gray-200 capitalize">
+              {key.replace(/([A-Z])/g, ' $1').trim()}:
+            </span>
+            <div className="pl-2">
+              {renderText(val)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  
+  return null;
+};
 
 const DeepDive = ({ workspaceId, finding }) => {
   const [loading, setLoading] = useState(false);
@@ -7,22 +45,36 @@ const DeepDive = ({ workspaceId, finding }) => {
   const [error, setError] = useState(null);
 
   const runDeepDive = async () => {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
-      const { api } = await import('../services/api.js');
-      const res = await (await import('../services/api.js')).default.post(`/research/run/${workspaceId}/deep-dive`, { finding });
+      const res = await api.post(`/research/run/${workspaceId}/deep-dive`, { finding });
       
-      const textResponse = res.data.data.deepDive;
-      try {
-        const jsonMatch = textResponse.match(/\\{.*\\}/s);
-        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : textResponse);
-        setResult(parsed);
-      } catch (e) {
-        setResult({ evidence: textResponse, latestSources: [], opposingFindings: '' });
+      let data = res.data?.data?.deepDive;
+      
+      if (!data) {
+        throw new Error("Invalid response format");
       }
+
+      // If Gemini returned a string, parse it manually
+      if (typeof data === 'string') {
+        try {
+          const jsonMatch = data.match(/\{.*\}/s);
+          data = JSON.parse(jsonMatch ? jsonMatch[0] : data);
+        } catch (e) {
+          data = { evidence: data };
+        }
+      }
+
+      setResult({
+        evidence: data.evidence || data.ValidatingEvidence || '',
+        opposingFindings: data.opposingFindings || data.Nuance || '',
+        latestSources: Array.isArray(data.latestSources) ? data.latestSources : []
+      });
     } catch (err) {
-      setError('Failed to run deep dive.');
+      console.error(err);
+      setError('Failed to run deep dive. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -46,19 +98,25 @@ const DeepDive = ({ workspaceId, finding }) => {
 
       {result && (
         <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3" /> Validating Evidence
-            </h4>
-            <p className="text-sm text-gray-700 dark:text-gray-300">{result.evidence}</p>
-          </div>
+          {result.evidence && (
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" /> Validating Evidence
+              </h4>
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                {renderText(result.evidence)}
+              </div>
+            </div>
+          )}
           
           {result.opposingFindings && (
             <div>
               <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-600 mb-1 flex items-center gap-1.5">
                 <AlertCircle className="w-3 h-3" /> Nuance & Opposing Views
               </h4>
-              <p className="text-sm text-gray-700 dark:text-gray-300">{result.opposingFindings}</p>
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                {renderText(result.opposingFindings)}
+              </div>
             </div>
           )}
 
@@ -70,9 +128,13 @@ const DeepDive = ({ workspaceId, finding }) => {
               <ul className="space-y-1">
                 {result.latestSources.map((s, idx) => (
                   <li key={idx} className="text-xs">
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                      {s.title}
-                    </a>
+                    {s.url ? (
+                      <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline break-all">
+                        {s.title || s.url}
+                      </a>
+                    ) : (
+                      <div className="text-xs">{renderText(s)}</div>
+                    )}
                   </li>
                 ))}
               </ul>

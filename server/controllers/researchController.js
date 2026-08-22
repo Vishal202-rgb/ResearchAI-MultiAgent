@@ -294,17 +294,22 @@ export const deepDive = async (req, res, next) => {
     if (!finding) return next(new AppError('Finding text is required for deep dive', 400));
 
     // Simple targeted research
-    const { default: searchWeb } = await import('../services/rag/searchService.js');
+    const { default: searchWeb } = await import('../services/search/searchService.js');
     const { retrieveRelevantContext } = await import('../services/rag/retrievalService.js');
     const { default: callGemini } = await import('../services/ai/geminiService.js');
+    const { default: Workspace } = await import('../models/Workspace.js');
 
-    // 1. Web search for latest sources
-    const searchResults = await searchWeb(finding, { maxResults: 3 });
-    const webContext = searchResults.map(s => `[${s.title}](${s.url}): ${s.snippet}`).join('\n');
+    const workspace = await Workspace.findOne({ _id: workspaceId, userId: req.user._id });
+    if (!workspace) return next(new AppError('Workspace not found or unauthorized', 404));
 
-    // 2. RAG retrieval
-    const ragResults = await retrieveRelevantContext(finding, workspaceId, req.user._id, 3);
-    const docContext = ragResults.map(d => d.text).join('\n');
+    // 1 & 2. Run Web search and RAG retrieval in parallel
+    const [searchResults, ragResults] = await Promise.all([
+      searchWeb(finding, { numResults: 3 }),
+      retrieveRelevantContext(finding, workspaceId, req.user._id, 3)
+    ]);
+
+    const webContext = (searchResults || []).map(s => `[${s.title}](${s.url}): ${s.snippet}`).join('\n');
+    const docContext = (ragResults || []).map(d => d.text).join('\n');
 
     const prompt = `Perform a targeted deep dive on the following finding: "${finding}"
 
@@ -326,7 +331,7 @@ Return JSON ONLY:
   "opposingFindings": "Contradictions or nuances"
 }`;
 
-    const result = await callGemini(prompt, { temperature: 0.3 });
+    const result = await callGemini(prompt, { temperature: 0.3, retries: 0 });
 
     res.status(200).json({
       success: true,
