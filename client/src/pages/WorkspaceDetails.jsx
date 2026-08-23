@@ -24,6 +24,7 @@ import TraceEvidenceModal from '../components/TraceEvidenceModal.jsx';
 import ContradictionsModal from '../components/ContradictionsModal.jsx';
 import WhatChangedModal from '../components/WhatChangedModal.jsx';
 import DebatePanel from '../components/DebatePanel.jsx';
+import ResearchIntelligence from '../components/ResearchIntelligence.jsx';
 
 const statusStyles = {
   draft: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400',
@@ -475,9 +476,30 @@ const WorkspaceDetails = () => {
                 </div>
               )}
 
+              <ResearchIntelligence 
+                  hasResults={hasResults}
+                  onTraceEvidence={() => {
+                    if (hasResults) {
+                      document.getElementById('findings-section')?.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  onDebate={() => {
+                    if (hasResults) setActiveTab('debate');
+                  }}
+                  onContradictions={() => {
+                    if (hasResults) setContradictionsModalOpen(true);
+                  }}
+                  onWhatChanged={() => {
+                    if (hasResults) setWhatChangedModalOpen(true);
+                  }}
+                  onNavigateTab={(tab) => {
+                    if (hasResults) setActiveTab(tab);
+                  }}
+                />
+
               {/* Findings */}
               {hasResults && (
-                <div className="space-y-8">
+                <div id="findings-section" className="space-y-8">
                   <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2 mb-1">
