@@ -49,6 +49,28 @@ const workspaceSchema = new mongoose.Schema(
   }
 );
 
+workspaceSchema.pre('findOneAndDelete', async function (next) {
+  const docToQuery = await this.model.findOne(this.getQuery());
+  if (docToQuery) {
+    const workspaceId = docToQuery._id;
+    const models = [
+      'AgentLog',
+      'ChatMessage',
+      'Document',
+      'Report',
+      'ResearchFinding',
+      'ResearchPlan',
+      'ResearchRun',
+      'Source',
+    ];
+
+    for (const modelName of models) {
+      await mongoose.model(modelName).deleteMany({ workspaceId });
+    }
+  }
+  next();
+});
+
 const Workspace = mongoose.model('Workspace', workspaceSchema);
 
 export default Workspace;
