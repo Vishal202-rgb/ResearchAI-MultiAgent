@@ -53,20 +53,15 @@ export const uploadDocument = async (req, res, next) => {
       status: 'pending'
     });
 
-    // Await background processing to ensure Vercel doesn't kill the lambda
-    try {
-      await processDocument(doc._id);
-    } catch (err) {
-      console.error('Doc process error:', err);
-      // We still return 201 because the document was created, but status will be 'failed' in DB
-    }
-
-    // Refetch the document to return the updated status (indexed or failed)
-    const updatedDoc = await Document.findById(doc._id);
+    // Process in background to prevent timeout
+    processDocument(doc._id).catch(err => {
+      console.error('Background doc process error:', err);
+    });
 
     res.status(201).json({
       success: true,
-      data: { document: updatedDoc }
+      message: 'Document uploaded and is being processed',
+      data: { document: doc }
     });
   } catch (error) {
     next(error);

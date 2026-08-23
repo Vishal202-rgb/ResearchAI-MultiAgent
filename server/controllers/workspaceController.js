@@ -183,13 +183,15 @@ export const getWorkspaceStats = async (req, res, next) => {
     const total = await Workspace.countDocuments({ userId: req.user._id });
     const active = await Workspace.countDocuments({ userId: req.user._id, status: 'active' });
 
+    const documents = await Document.countDocuments({ userId: req.user._id });
+
     res.status(200).json({
       success: true,
       data: {
         stats: {
           totalWorkspaces: total,
           activeResearch: active,
-          documents: 0,
+          documents: documents,
         },
       },
     });

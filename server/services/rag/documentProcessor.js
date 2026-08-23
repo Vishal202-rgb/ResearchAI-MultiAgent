@@ -250,6 +250,12 @@ export const processDocument = async (documentId) => {
     console.log(
       `Document processed successfully: ${documentId}`
     );
+
+    // Clean up temporary file
+    if (doc.path && fs.existsSync(doc.path)) {
+      fs.unlinkSync(doc.path);
+      console.log(`Cleaned up temporary file: ${doc.path}`);
+    }
   } catch (error) {
     console.error(
       `Document processing failed for ${documentId}:`,
