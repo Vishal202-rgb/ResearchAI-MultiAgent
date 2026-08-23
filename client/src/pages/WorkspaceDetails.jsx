@@ -69,8 +69,8 @@ const AutoRunOverlay = ({ generating, running, run, plan, error, onRetry, onClos
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-2xl bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-3xl p-10 md:p-16 shadow-2xl relative overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-2xl bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-10 md:p-16 shadow-2xl relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent animate-[shimmer_2s_infinite] pointer-events-none" />
         <div className="relative z-10">
           <div className="flex items-center justify-center mb-8">
@@ -520,7 +520,7 @@ const WorkspaceDetails = () => {
                     </div>
                   </div>
 
-                  <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-sm">
+                  <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 sm:p-8 shadow-sm">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4 flex items-center gap-2">
                       <ListChecks className="w-4 h-4" /> Executive Summary
                     </h3>

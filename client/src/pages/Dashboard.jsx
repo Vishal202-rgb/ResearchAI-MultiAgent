@@ -125,19 +125,19 @@ const Dashboard = () => {
       <Navbar />
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
         {/* COMMAND CENTER */}
-        <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-8 mb-12 shadow-sm relative overflow-hidden">
+        <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 sm:p-8 mb-12 shadow-sm relative overflow-hidden">
           <div className="absolute -top-32 -right-32 w-64 h-64 bg-gray-200/50 dark:bg-gray-800/30 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-gray-200/50 dark:bg-gray-800/30 rounded-full blur-3xl pointer-events-none" />
           
           <div className="relative max-w-3xl mx-auto text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-3 flex items-center justify-center gap-3">
-              <Compass className="w-8 h-8 text-gray-400" />
-              What do you want to research?
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-gray-900 dark:text-white mb-4 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+              <Compass className="w-8 h-8 text-gray-400 shrink-0" />
+              <span className="leading-tight">What do you want to research?</span>
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xl mx-auto">
+            <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mb-8 max-w-xl mx-auto leading-relaxed px-2">
               Enter a topic and our multi-agent AI workflow will gather, analyze, and synthesize verifiable web sources for you.
             </p>
             
@@ -165,13 +165,13 @@ const Dashboard = () => {
             </form>
             
             <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
-              <span className="text-xs text-gray-500 font-medium mr-2">Try:</span>
+              <span className="text-xs text-gray-500 font-medium w-full text-center md:w-auto md:text-left mb-2 md:mb-0 mr-0 md:mr-2">Try:</span>
               {prompts.map((p, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => setSearchInput(p)}
-                  className="text-xs px-3 py-1.5 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 text-gray-600 dark:text-gray-300 rounded-full transition-colors"
+                  className="text-xs px-3 py-2 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl transition-colors text-left leading-relaxed break-words max-w-full h-auto"
                 >
                   {p}
                 </button>
@@ -179,7 +179,7 @@ const Dashboard = () => {
             </div>
             
             {/* Visual Workflow */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-xs font-medium text-gray-500 uppercase tracking-widest border-t border-gray-100 dark:border-gray-800/50 pt-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row items-center justify-center md:justify-between gap-6 md:gap-2 text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-widest border-t border-gray-100 dark:border-gray-800/50 pt-8">
               <div className="flex flex-col items-center gap-2 group cursor-default">
                 <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 flex items-center justify-center group-hover:scale-110 group-hover:border-gray-400 dark:group-hover:border-gray-600 transition-all shadow-sm"><Target className="w-4 h-4" /></div>
                 Planner
@@ -197,10 +197,10 @@ const Dashboard = () => {
               <ChevronRight className="w-4 h-4 hidden md:block opacity-30" />
               <div className="flex flex-col items-center gap-2 group cursor-default">
                 <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 flex items-center justify-center group-hover:scale-110 group-hover:border-gray-400 dark:group-hover:border-gray-600 transition-all shadow-sm"><ShieldCheck className="w-4 h-4" /></div>
-                Fact Checker
+                <span className="text-center">Fact Checker</span>
               </div>
               <ChevronRight className="w-4 h-4 hidden md:block opacity-30" />
-              <div className="flex flex-col items-center gap-2 group cursor-default">
+              <div className="flex flex-col items-center gap-2 group cursor-default col-span-2 sm:col-span-1">
                 <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 flex items-center justify-center group-hover:scale-110 group-hover:border-gray-400 dark:group-hover:border-gray-600 transition-all shadow-sm"><FileText className="w-4 h-4" /></div>
                 Synthesizer
               </div>

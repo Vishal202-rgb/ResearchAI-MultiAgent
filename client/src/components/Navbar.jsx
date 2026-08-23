@@ -9,17 +9,17 @@ const Navbar = () => {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md">
-      <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link to="/dashboard" className="flex items-center gap-2 group">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <Link to="/dashboard" className="flex items-center gap-2 group shrink-0">
           <div className="w-7 h-7 rounded bg-gray-900 dark:bg-white flex items-center justify-center transition-transform group-hover:scale-105">
             <Brain className="w-4 h-4 text-white dark:text-gray-900" />
           </div>
-          <span className="text-sm font-semibold tracking-tight text-gray-900 dark:text-white">
+          <span className="text-sm font-semibold tracking-tight text-gray-900 dark:text-white hidden sm:block">
             ResearchAI
           </span>
         </Link>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link 
             to="/library" 
             className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
@@ -28,21 +28,21 @@ const Navbar = () => {
           </Link>
           <button 
             onClick={toggleTheme} 
-            className="p-1.5 text-gray-400 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white transition-colors rounded-md"
+            className="p-1.5 text-gray-400 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white transition-colors rounded-md shrink-0"
             title="Toggle theme"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           
-          <div className="w-px h-4 bg-gray-200 dark:bg-gray-800"></div>
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
           
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 dark:text-gray-300 font-medium hidden sm:block">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="text-sm text-gray-600 dark:text-gray-300 font-medium hidden md:block">
               {user?.name}
             </span>
             <button 
               onClick={() => logout()} 
-              className="p-1.5 text-gray-400 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white transition-colors rounded-md" 
+              className="p-1.5 text-gray-400 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white transition-colors rounded-md shrink-0" 
               title="Logout"
             >
               <LogOut className="w-4 h-4" />

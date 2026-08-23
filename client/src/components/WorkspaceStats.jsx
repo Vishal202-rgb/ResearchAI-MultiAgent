@@ -9,14 +9,14 @@ const WorkspaceStats = ({ stats, status }) => {
   ];
 
   return (
-    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm mb-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm mb-8 overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-indigo-500" /> Research Intelligence Dashboard
+          <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" /> <span className="truncate">Research Intelligence Dashboard</span>
         </h3>
         {status === 'completed' && (
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-900/50">
-            <TrendingUp className="w-3.5 h-3.5" /> High Confidence
+          <span className="flex w-fit items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-900/50">
+            <TrendingUp className="w-3.5 h-3.5 shrink-0" /> High Confidence
           </span>
         )}
       </div>
