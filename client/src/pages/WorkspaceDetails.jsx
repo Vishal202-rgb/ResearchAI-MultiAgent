@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, X, Loader2, Target, HelpCircle, 
   ListChecks, AlertCircle, RefreshCw, Play, CheckCircle2, Circle, 
-  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock, Bot, BookMarked, Bookmark
+  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock, Bot, BookMarked, Bookmark, Swords
 } from 'lucide-react';
 import useWorkspaceStore from '../store/workspaceStore.js';
 import useAuthStore from '../store/authStore.js';
@@ -20,6 +20,7 @@ import ChatPanel from '../components/ChatPanel.jsx';
 import ReportPanel from '../components/ReportPanel.jsx';
 import TimelinePanel from '../components/TimelinePanel.jsx';
 import DeepDive from '../components/DeepDive.jsx';
+import DebatePanel from '../components/DebatePanel.jsx';
 
 const statusStyles = {
   draft: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400',
@@ -38,6 +39,7 @@ const agentTypeLabels = {
 
 const Tabs = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'debate', label: 'Debate Mode', icon: Swords },
   { id: 'timeline', label: 'Timeline', icon: Clock },
   { id: 'documents', label: 'Documents & RAG', icon: FileUp },
   { id: 'graph', label: 'Knowledge Graph', icon: Network },
@@ -152,6 +154,7 @@ const WorkspaceDetails = () => {
   const [toast, setToast] = useState(null);
   const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [debateFinding, setDebateFinding] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const location = useLocation();
   const [autoStartHandled, setAutoStartHandled] = useState(false);
@@ -162,6 +165,11 @@ const WorkspaceDetails = () => {
     const res = await saveInsight({ workspaceId: id, findingText: finding });
     if (res.success) setToast({ message: 'Insight saved to library!', type: 'success' });
     else setToast({ message: res.message, type: 'error' });
+  };
+
+  const handleDebateFinding = (finding) => {
+    setDebateFinding(finding);
+    setActiveTab('debate');
   };
 
   const handleSaveSource = async (source) => {
@@ -414,6 +422,7 @@ const WorkspaceDetails = () => {
           {activeTab === 'chat' && <ChatPanel workspaceId={id} />}
           {activeTab === 'report' && <ReportPanel workspaceId={id} />}
           {activeTab === 'timeline' && <TimelinePanel sources={sources} />}
+          {activeTab === 'debate' && <DebatePanel workspaceId={id} results={results} onSaveInsight={handleSaveInsight} initialFinding={debateFinding} />}
           
           {activeTab === 'overview' && (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -491,7 +500,12 @@ const WorkspaceDetails = () => {
                                   <BookMarked className="w-4 h-4 group-hover:scale-110 transition-transform" />
                                 </button>
                               </div>
-                              <DeepDive workspaceId={id} finding={finding} />
+                                <div className="mt-3 bg-gray-50 dark:bg-[#151515] rounded-lg p-4 border border-gray-200 dark:border-gray-800 flex items-start gap-6">
+                                  <DeepDive workspaceId={id} finding={finding} />
+                                  <button onClick={() => handleDebateFinding(finding)} className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white hover:underline transition-colors mt-[1px]">
+                                    <Swords className="w-3.5 h-3.5" /> Debate this finding
+                                  </button>
+                                </div>
                             </div>
                           </li>
                         ))}

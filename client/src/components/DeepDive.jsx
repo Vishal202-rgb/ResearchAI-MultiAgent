@@ -57,7 +57,6 @@ const DeepDive = ({ workspaceId, finding }) => {
         throw new Error("Invalid response format");
       }
 
-      // If Gemini returned a string, parse it manually
       if (typeof data === 'string') {
         try {
           const jsonMatch = data.match(/\{.*\}/s);
@@ -81,7 +80,7 @@ const DeepDive = ({ workspaceId, finding }) => {
   };
 
   return (
-    <div className="mt-3 bg-gray-50 dark:bg-[#151515] rounded-lg p-4 border border-gray-200 dark:border-gray-800">
+    <div className="w-auto">
       {!result && !loading && !error && (
         <button onClick={runDeepDive} className="flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
           <Target className="w-3.5 h-3.5" /> Run Deep Dive on this finding
@@ -89,15 +88,15 @@ const DeepDive = ({ workspaceId, finding }) => {
       )}
       
       {loading && (
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Running targeted RAG & Web Search...
         </div>
       )}
 
-      {error && <div className="text-xs text-red-500">{error}</div>}
+      {error && <div className="text-xs text-red-500 mt-2">{error}</div>}
 
       {result && (
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-4 animate-in fade-in mt-4">
           {result.evidence && (
             <div>
               <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1.5">
