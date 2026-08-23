@@ -122,7 +122,9 @@ export const globalSearch = async (req, res, next) => {
       return res.status(200).json({ success: true, data: { results: [] } });
     }
 
-    const regex = new RegExp(q, 'i');
+    // Escape regex special characters to prevent ReDoS
+    const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedQ, 'i');
     const results = [];
 
     // Search Workspaces

@@ -40,8 +40,9 @@ Return ONLY valid JSON in this format:
 
       // Create Nodes
       for (const node of graphData.nodes || []) {
+        const label = (node.label || 'Concept').replace(/[^a-zA-Z0-9_]/g, '_');
         await tx.run(
-          `MERGE (n:${node.label || 'Concept'} {id: $id, workspaceId: $workspaceId, userId: $userId})
+          `MERGE (n:${label} {id: $id, workspaceId: $workspaceId, userId: $userId})
            SET n.name = $id`,
           { 
             id: node.id, 
