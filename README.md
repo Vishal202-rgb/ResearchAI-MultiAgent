@@ -13,8 +13,13 @@ ResearchAI is a full-stack MERN-based AI research workspace that automates the c
 - 📚 **Document RAG** — Upload PDF/TXT documents and perform contextual research using Pinecone.
 - 🧠 **Knowledge Graph** — Neo4j-powered entity and relationship visualization.
 - 💬 **Research Chat** — Ask questions about completed research and documents.
-- 🔬 **Deep Dive Research** — Perform targeted follow-up research on individual findings.
-- ⚖️ **Research Comparison** — Compare two completed research workspaces.
+- 🎯 **Deep Dive Research** – Perform targeted follow-up research on individual findings.
+- 🔎 **Trace Evidence** – Map claims directly to supporting and contradicting web sources and RAG documents.
+- ⚔️ **Debate Findings** – Trigger Pro vs Counter adversarial AI agents to challenge bias and hallucination.
+- ⚠️ **Contradiction Detection** – Automatically cross-reference findings to highlight conflicting claims.
+- 🔄 **What Changed?** – Run evolutionary analysis between past and present research to track new and retracted claims.
+- 📱 **Premium Responsive UI** – Flawlessly optimized across mobile, tablet, and desktop viewports with discovery-first UX.
+- ⚖️ **Research Comparison** – Compare two completed research workspaces.
 - ⏳ **Research Timeline** — Visualize important research events chronologically.
 - 🔎 **Global Search** — Search across workspaces and research content.
 - 📄 **PDF Export** — Export research results into structured PDF reports.
@@ -636,23 +641,19 @@ Research Question
        ↓
 Multi-Agent Research
        ↓
-Real Web Sources
+Real Web Sources + RAG Documents
        ↓
-RAG + Documents
+Knowledge Graph + Fact Checking
        ↓
-Fact Checking
+Trace Evidence + Debate Findings
        ↓
-Knowledge Graph
+Contradictions + What Changed?
        ↓
 Comparison + Timeline
        ↓
-Research Chat
+Research Chat + Deep Dive
        ↓
-Deep Dive
-       ↓
-Final Report
-       ↓
-PDF Export
+Final Report + PDF Export
 ```
 
 ---
@@ -668,6 +669,9 @@ Currently implemented:
 - PDF/TXT RAG
 - Pinecone Vector Search
 - Neo4j Knowledge Graph
+- Trace Evidence & Debate Findings
+- Contradiction Detection
+- What Changed? (Research Evolution)
 - Research Chat
 - Deep Dive Research
 - Workspace Comparison
@@ -676,6 +680,7 @@ Currently implemented:
 - PDF Export
 - JWT Authentication
 - Demo Workspaces
+- Responsive Premium UI
 - Dark/Light Mode
 - Vercel Deployment
 
