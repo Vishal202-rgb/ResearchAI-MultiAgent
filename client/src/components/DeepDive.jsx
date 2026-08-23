@@ -82,8 +82,8 @@ const DeepDive = ({ workspaceId, finding }) => {
   return (
     <div className="w-auto">
       {!result && !loading && !error && (
-        <button onClick={runDeepDive} className="flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
-          <Target className="w-3.5 h-3.5" /> Run Deep Dive on this finding
+        <button onClick={runDeepDive} className="flex items-center gap-1.5 text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 transition-colors">
+          <Target className="w-3.5 h-3.5 text-indigo-500" /> Deep Dive
         </button>
       )}
       

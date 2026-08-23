@@ -419,3 +419,224 @@ Evaluate the entire debate. You must output a JSON object exactly matching this 
     next(error);
   }
 };
+
+export const traceEvidence = async (req, res, next) => {
+  try {
+    const { workspaceId } = req.params;
+    const { claim } = req.body;
+    
+    if (!claim) return next(new AppError('Claim is required', 400));
+    
+    const { default: Source } = await import('../models/Source.js');
+    const { default: ResearchRun } = await import('../models/ResearchRun.js');
+    const { retrieveRelevantContext } = await import('../services/rag/retrievalService.js');
+    const { default: callGemini } = await import('../services/ai/geminiService.js');
+    
+    const { default: Workspace } = await import('../models/Workspace.js');
+    const workspace = await Workspace.findOne({ _id: workspaceId, userId: req.user._id });
+    if (!workspace) return next(new AppError('Workspace not found', 404));
+    const run = await ResearchRun.findOne({ workspaceId, status: 'completed' }).sort({ createdAt: -1 });
+    if (!run) return next(new AppError('No completed research run found', 404));
+    
+    const sources = await Source.find({ workspaceId, researchRunId: run._id });
+    const ragContext = await retrieveRelevantContext(claim, workspaceId, req.user._id, 5);
+    
+    const conciseSources = sources.map((s, i) => `[Source ${i + 1}] | Title: ${s.title} | URL: ${s.url} | Publisher: ${s.publisher} | Date: ${s.publishedDate} | Snippet: ${s.snippet}`).join('\n');
+    const ragSummaries = ragContext.map(r => `ID: ${r.id} | Content: ${r.content}`).join('\n');
+    
+    const prompt = `You are an AI research assistant. Your task is to trace the evidence for this claim: "${claim}"
+    
+The claim likely contains bracketed references like [Source 1], [Source 2], etc.
+Match these references explicitly to the provided web sources which are numbered [Source 1], [Source 2], etc.
+If the claim specifically cites a source, include it in the supporting evidence and explain why.
+
+Here are the collected web sources:
+${conciseSources}
+
+Here are related RAG document snippets:
+${ragSummaries}
+
+Analyze these sources and document snippets. Determine which ones support the claim and which ones contradict or challenge it.
+Return the result strictly as a JSON object matching this schema:
+{
+  "supporting": [
+    {
+      "sourceId": "The ID of the source or document",
+      "title": "Title",
+      "publisher": "Publisher (if any)",
+      "url": "URL (if any)",
+      "date": "Date (if any)",
+      "snippet": "Short relevant snippet from the source text",
+      "reason": "Why this supports the claim (1-2 sentences)"
+    }
+  ],
+  "contradicting": [
+    {
+      "sourceId": "The ID",
+      "title": "Title",
+      "publisher": "...",
+      "url": "...",
+      "date": "...",
+      "snippet": "...",
+      "reason": "Why this contradicts or challenges the claim"
+    }
+  ]
+}
+If no sources support or contradict, leave the arrays empty.
+`;
+
+    const result = await callGemini(prompt, { temperature: 0.2, retries: 1 });
+    
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const detectContradictions = async (req, res, next) => {
+  try {
+    const { workspaceId } = req.params;
+    
+    const { default: Source } = await import('../models/Source.js');
+    const { default: ResearchRun } = await import('../models/ResearchRun.js');
+    const { default: ResearchFinding } = await import('../models/ResearchFinding.js');
+    const { default: callGemini } = await import('../services/ai/geminiService.js');
+    
+    const { default: Workspace } = await import('../models/Workspace.js');
+    const workspace = await Workspace.findOne({ _id: workspaceId, userId: req.user._id });
+    if (!workspace) return next(new AppError('Workspace not found', 404));
+    const run = await ResearchRun.findOne({ workspaceId, status: 'completed' }).sort({ createdAt: -1 });
+    if (!run) return next(new AppError('No completed research run found', 404));
+    
+    const findingDoc = await ResearchFinding.findOne({ researchRunId: run._id });
+    const sources = await Source.find({ researchRunId: run._id }).limit(20);
+    
+    const findingsText = findingDoc?.keyFindings?.join('\n') || '';
+    const claimsText = findingDoc?.claims?.map(c => c.claim).join('\n') || '';
+    const conciseSources = sources.map(s => `Title: ${s.title} | Snippet: ${s.snippet}`).join('\n');
+    
+    const prompt = `You are a rigorous AI Fact-Checker and Contradiction Detector.
+Analyze the following research findings/claims and the collected source evidence.
+Look for MEANINGFUL contradictions (e.g. conflicting data points, opposite conclusions).
+Do not assume two sources contradict each other simply because their wording differs. Use actual evidence to determine if a meaningful contradiction exists.
+
+Findings/Claims:
+${findingsText}
+${claimsText}
+
+Source Evidence:
+${conciseSources}
+
+Return the result as a strict JSON object with this schema:
+{
+  "contradictions": [
+    {
+      "type": "claim_vs_claim" | "source_vs_source" | "claim_vs_source",
+      "itemA": "Text of claim A or source A",
+      "itemB": "Text of claim B or source B",
+      "whyConflict": "Explanation of the conflict",
+      "explanation": "Possible explanation (e.g., Different datasets, Different time periods, Different methodologies, Different populations, Or genuinely conflicting evidence)",
+      "severity": "High" | "Medium" | "Low",
+      "supportingEvidence": "Summary of evidence supporting A",
+      "conflictingEvidence": "Summary of evidence supporting B"
+    }
+  ]
+}
+If there are no meaningful contradictions, return { "contradictions": [] }
+`;
+
+    const result = await callGemini(prompt, { temperature: 0.2, retries: 1 });
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getHistoryDiff = async (req, res, next) => {
+  try {
+    const { workspaceId } = req.params;
+    const { default: ResearchRun } = await import('../models/ResearchRun.js');
+    const { default: ResearchFinding } = await import('../models/ResearchFinding.js');
+    const { default: Source } = await import('../models/Source.js');
+    const { default: callGemini } = await import('../services/ai/geminiService.js');
+    
+    const { default: Workspace } = await import('../models/Workspace.js');
+    const workspace = await Workspace.findOne({ _id: workspaceId, userId: req.user._id });
+    if (!workspace) return next(new AppError('Workspace not found', 404));
+    const findings = await ResearchFinding.find({ workspaceId }).sort({ createdAt: -1 }).limit(2);
+    
+    if (findings.length < 2) {
+      return res.status(200).json({ success: true, data: { notEnoughHistory: true } });
+    }
+    
+    const [latestFindings, previousFindings] = findings;
+    const latestRunId = latestFindings.researchRunId;
+    const previousRunId = previousFindings.researchRunId;
+    
+    const latestSources = await Source.find({ researchRunId: latestRunId });
+    const previousSources = await Source.find({ researchRunId: previousRunId });
+    
+    const getUrls = (sources) => sources.map(s => s.url).filter(Boolean);
+    const prevUrls = getUrls(previousSources);
+    const currUrls = getUrls(latestSources);
+    
+    const newSources = latestSources.filter(s => s.url && !prevUrls.includes(s.url));
+    const removedSources = previousSources.filter(s => s.url && !currUrls.includes(s.url));
+    
+    const prevFindingsArr = previousFindings?.keyFindings || [];
+    const currFindingsArr = latestFindings?.keyFindings || [];
+    
+    const newFindings = currFindingsArr.filter(f => !prevFindingsArr.includes(f));
+    const removedFindings = prevFindingsArr.filter(f => !currFindingsArr.includes(f));
+    
+    const prompt = `You are a Research Diff Analyzer. Compare the previous research results to the latest research results.
+Determine if the research changed significantly, moderately, or minimally. Explain the most important changes in 3-5 concise points.
+
+Previous Key Findings:
+${prevFindingsArr.map(f => '- ' + f).join('\n')}
+Previous Summary:
+${previousFindings?.summary || ''}
+
+Latest Key Findings:
+${currFindingsArr.map(f => '- ' + f).join('\n')}
+Latest Summary:
+${latestFindings?.summary || ''}
+
+Newly Added Sources:
+${newSources.map(s => '- ' + s.title).join('\n')}
+
+Removed Sources:
+${removedSources.map(s => '- ' + s.title).join('\n')}
+
+Return a strict JSON object matching this schema:
+{
+  "summaryLevel": "significantly" | "moderately" | "minimally",
+  "points": ["point 1", "point 2", "point 3"],
+  "changedFindings": [
+    { "previous": "previous finding text", "latest": "how it evolved in the latest" }
+  ],
+  "changedEvidence": [
+    { "previous": "previous evidence summary", "latest": "latest evidence summary" }
+  ]
+}
+`;
+
+    const semanticDiff = await callGemini(prompt, { temperature: 0.1, retries: 1 });
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        notEnoughHistory: false,
+        newFindings: newFindings,
+        removedFindings: removedFindings,
+        newSources: newSources.map(s => ({ title: s.title, url: s.url, publisher: s.publisher })),
+        removedSources: removedSources.map(s => ({ title: s.title, url: s.url, publisher: s.publisher })),
+        semanticDiff
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+

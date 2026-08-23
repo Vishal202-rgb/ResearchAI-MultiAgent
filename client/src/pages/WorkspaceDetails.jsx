@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, X, Loader2, Target, HelpCircle, 
   ListChecks, AlertCircle, RefreshCw, Play, CheckCircle2, Circle, 
-  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock, Bot, BookMarked, Bookmark, Swords
+  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock, Bot, BookMarked, Bookmark, Swords, AlertTriangle, History, Search
 } from 'lucide-react';
 import useWorkspaceStore from '../store/workspaceStore.js';
 import useAuthStore from '../store/authStore.js';
@@ -20,6 +20,9 @@ import ChatPanel from '../components/ChatPanel.jsx';
 import ReportPanel from '../components/ReportPanel.jsx';
 import TimelinePanel from '../components/TimelinePanel.jsx';
 import DeepDive from '../components/DeepDive.jsx';
+import TraceEvidenceModal from '../components/TraceEvidenceModal.jsx';
+import ContradictionsModal from '../components/ContradictionsModal.jsx';
+import WhatChangedModal from '../components/WhatChangedModal.jsx';
 import DebatePanel from '../components/DebatePanel.jsx';
 
 const statusStyles = {
@@ -155,6 +158,9 @@ const WorkspaceDetails = () => {
   const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [debateFinding, setDebateFinding] = useState('');
+  const [traceFinding, setTraceFinding] = useState(null);
+  const [contradictionsModalOpen, setContradictionsModalOpen] = useState(false);
+  const [whatChangedModalOpen, setWhatChangedModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const location = useLocation();
   const [autoStartHandled, setAutoStartHandled] = useState(false);
@@ -471,45 +477,67 @@ const WorkspaceDetails = () => {
 
               {/* Findings */}
               {hasResults && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" /> Detailed Research Report
-                    </h2>
-                    <button onClick={handleExecuteResearch} className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
-                      <RefreshCw className="w-3.5 h-3.5" /> Run Again
-                    </button>
+                <div className="space-y-8">
+                  <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2 mb-1">
+                        <Sparkles className="w-5 h-5 text-indigo-500" /> Detailed Research Report
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Comprehensive analysis and validated claims</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button onClick={() => setContradictionsModalOpen(true)} className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-amber-600 dark:bg-[#111] dark:text-gray-300 dark:border-gray-800 dark:hover:bg-[#1a1a1a] dark:hover:text-amber-400 rounded-xl px-4 py-2 transition-all shadow-sm">
+                        <AlertTriangle className="w-4 h-4" /> Detect Contradictions
+                      </button>
+                      <button onClick={() => setWhatChangedModalOpen(true)} className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-indigo-600 dark:bg-[#111] dark:text-gray-300 dark:border-gray-800 dark:hover:bg-[#1a1a1a] dark:hover:text-indigo-400 rounded-xl px-4 py-2 transition-all shadow-sm">
+                        <History className="w-4 h-4" /> What Changed?
+                      </button>
+                      <button onClick={handleExecuteResearch} className="flex items-center gap-2 text-sm font-semibold text-white bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 rounded-xl px-4 py-2 transition-all shadow-sm">
+                        <RefreshCw className="w-4 h-4" /> Run Again
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">Executive Summary</h3>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{results.summary}</p>
+                  <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4 flex items-center gap-2">
+                      <ListChecks className="w-4 h-4" /> Executive Summary
+                    </h3>
+                    <p className="text-base text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{results.summary}</p>
                   </div>
 
                   {results.keyFindings && results.keyFindings.length > 0 && (
-                    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm">
-                      <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Key Findings</h3>
-                      <ul className="space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 dark:text-white px-2 flex items-center gap-2">
+                        <Target className="w-4 h-4 text-emerald-500" /> Verified Key Findings
+                      </h3>
+                      <div className="grid gap-4">
                         {results.keyFindings.map((finding, i) => (
-                          <li key={i} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
-                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center text-[10px] font-bold mt-0.5">{i + 1}</span>
-                            <div className="flex-1">
-                              <div className="flex items-start justify-between gap-4">
-                                <span className="leading-relaxed block">{finding}</span>
-                                <button onClick={() => handleSaveInsight(finding)} className="flex-shrink-0 text-gray-400 hover:text-indigo-500 transition-colors p-1 group" title="Save Insight">
-                                  <BookMarked className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                </button>
+                          <div key={i} className="group bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700 transition-all">
+                            <div className="flex items-start gap-4">
+                              <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm font-bold border border-indigo-100 dark:border-indigo-500/20">
+                                {i + 1}
                               </div>
-                                <div className="mt-3 bg-gray-50 dark:bg-[#151515] rounded-lg p-4 border border-gray-200 dark:border-gray-800 flex items-start gap-6">
-                                  <DeepDive workspaceId={id} finding={finding} />
-                                  <button onClick={() => handleDebateFinding(finding)} className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white hover:underline transition-colors mt-[1px]">
-                                    <Swords className="w-3.5 h-3.5" /> Debate this finding
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-4 mb-4">
+                                  <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-snug">{finding}</h4>
+                                  <button onClick={() => handleSaveInsight(finding)} className="flex-shrink-0 text-gray-400 hover:text-indigo-600 transition-colors p-1" title="Save Insight">
+                                    <BookMarked className="w-5 h-5" />
                                   </button>
                                 </div>
+                                <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/60">
+                                  <DeepDive workspaceId={id} finding={finding} />
+                                  <button onClick={() => handleDebateFinding(finding)} className="flex items-center gap-1.5 text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 transition-colors">
+                                    <Swords className="w-3.5 h-3.5 text-rose-500" /> Debate
+                                  </button>
+                                  <button onClick={() => setTraceFinding(finding)} className="flex items-center gap-1.5 text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 transition-colors">
+                                    <Search className="w-3.5 h-3.5 text-emerald-500" /> Trace Evidence
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </li>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   )}
 
@@ -606,6 +634,23 @@ const WorkspaceDetails = () => {
           )}
         </div>
       </main>
+      
+      <TraceEvidenceModal 
+        isOpen={!!traceFinding} 
+        onClose={() => setTraceFinding(null)} 
+        finding={traceFinding} 
+        workspaceId={id} 
+      />
+      <ContradictionsModal 
+        isOpen={contradictionsModalOpen} 
+        onClose={() => setContradictionsModalOpen(false)} 
+        workspaceId={id} 
+      />
+      <WhatChangedModal 
+        isOpen={whatChangedModalOpen} 
+        onClose={() => setWhatChangedModalOpen(false)} 
+        workspaceId={id} 
+      />
     </div>
   );
 };
