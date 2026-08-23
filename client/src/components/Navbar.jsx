@@ -20,6 +20,12 @@ const Navbar = () => {
         </Link>
         
         <div className="flex items-center gap-4">
+          <Link 
+            to="/library" 
+            className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          >
+            Library
+          </Link>
           <button 
             onClick={toggleTheme} 
             className="p-1.5 text-gray-400 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white transition-colors rounded-md"

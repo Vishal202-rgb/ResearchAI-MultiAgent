@@ -10,6 +10,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import graphRoutes from './routes/graphRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import libraryRoutes from './routes/libraryRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
@@ -49,6 +50,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/graph', graphRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/library', libraryRoutes);
 
 // 404 handler
 app.use((req, res) => {

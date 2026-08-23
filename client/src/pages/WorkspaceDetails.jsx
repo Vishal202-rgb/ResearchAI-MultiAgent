@@ -3,11 +3,12 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Edit3, Trash2, X, Loader2, Target, HelpCircle, 
   ListChecks, AlertCircle, RefreshCw, Play, CheckCircle2, Circle, 
-  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock, Bot
+  LayoutDashboard, FileUp, Network, MessageSquare, Download, Sparkles, Quote, Brain, Activity, Clock, Bot, BookMarked, Bookmark
 } from 'lucide-react';
 import useWorkspaceStore from '../store/workspaceStore.js';
 import useAuthStore from '../store/authStore.js';
 import useResearchStore from '../store/researchStore.js';
+import useLibraryStore from '../store/libraryStore.js';
 import WorkspaceForm from '../components/WorkspaceForm.jsx';
 import WorkspaceStats from '../components/WorkspaceStats.jsx';
 import Toast from '../components/Toast.jsx';
@@ -146,6 +147,8 @@ const WorkspaceDetails = () => {
     generatePlan, fetchPlan, startRun, fetchRun, fetchResults, clearResearch 
   } = useResearchStore();
   
+  const { saveInsight, saveSource } = useLibraryStore();
+
   const [toast, setToast] = useState(null);
   const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -154,6 +157,18 @@ const WorkspaceDetails = () => {
   const [autoStartHandled, setAutoStartHandled] = useState(false);
   const [showAutoRunOverlay, setShowAutoRunOverlay] = useState(false);
   const [autoRunError, setAutoRunError] = useState(null);
+
+  const handleSaveInsight = async (finding) => {
+    const res = await saveInsight({ workspaceId: id, findingText: finding });
+    if (res.success) setToast({ message: 'Insight saved to library!', type: 'success' });
+    else setToast({ message: res.message, type: 'error' });
+  };
+
+  const handleSaveSource = async (source) => {
+    const res = await saveSource({ workspaceId: id, title: source.title, url: source.url, publisher: source.publisher, date: source.date });
+    if (res.success) setToast({ message: 'Source saved to library!', type: 'success' });
+    else setToast({ message: res.message, type: 'error' });
+  };
 
   useEffect(() => {
     // Clear out stale state if we are loading a different workspace
@@ -470,7 +485,12 @@ const WorkspaceDetails = () => {
                           <li key={i} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
                             <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center text-[10px] font-bold mt-0.5">{i + 1}</span>
                             <div className="flex-1">
-                              <span className="leading-relaxed block">{finding}</span>
+                              <div className="flex items-start justify-between gap-4">
+                                <span className="leading-relaxed block">{finding}</span>
+                                <button onClick={() => handleSaveInsight(finding)} className="flex-shrink-0 text-gray-400 hover:text-indigo-500 transition-colors p-1 group" title="Save Insight">
+                                  <BookMarked className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                </button>
+                              </div>
                               <DeepDive workspaceId={id} finding={finding} />
                             </div>
                           </li>
@@ -514,13 +534,20 @@ const WorkspaceDetails = () => {
                         <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Web Sources / References</h3>
                         <div className="space-y-4">
                           {sources.filter(s => s.url && s.url.startsWith('http')).map((s, i) => (
-                            <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="block p-4 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800/50 transition-colors">
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-200 line-clamp-1 mb-1">{s.title}</h4>
+                            <div key={i} className="block p-4 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800/50 transition-colors group">
+                              <div className="flex items-start justify-between gap-4 mb-1">
+                                <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-gray-900 dark:text-gray-200 line-clamp-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                  {s.title}
+                                </a>
+                                <button onClick={() => handleSaveSource(s)} className="flex-shrink-0 text-gray-400 hover:text-emerald-500 transition-colors p-1 opacity-0 group-hover:opacity-100" title="Save Source">
+                                  <Bookmark className="w-4 h-4 hover:scale-110 transition-transform" />
+                                </button>
+                              </div>
                               <p className="text-xs text-gray-500 mb-2 truncate">{s.publisher} • {s.url}</p>
                               {s.snippet && (
                                 <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2 border-l-2 border-gray-300 dark:border-gray-700 pl-2 ml-1">{s.snippet}</p>
                               )}
-                            </a>
+                            </div>
                           ))}
                         </div>
                       </div>

@@ -8,6 +8,7 @@ import CreateWorkspace from './pages/CreateWorkspace.jsx';
 import WorkspaceDetails from './pages/WorkspaceDetails.jsx';
 import DemoWorkspace from './pages/DemoWorkspace.jsx';
 import CompareWorkspaces from './pages/CompareWorkspaces.jsx';
+import Library from './pages/Library.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import useAuthStore from './store/authStore.js';
 
@@ -83,6 +84,14 @@ function App() {
         element={
           <ProtectedRoute>
             <CompareWorkspaces />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/library"
+        element={
+          <ProtectedRoute>
+            <Library />
           </ProtectedRoute>
         }
       />
