@@ -10,12 +10,14 @@ const callGemini = async (prompt, options = {}) => {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+  const mimeType = options.responseMimeType || 'application/json';
+
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: options.temperature || 0.7,
       maxOutputTokens: options.maxTokens || 2048,
-      responseMimeType: 'application/json',
+      responseMimeType: mimeType,
     },
   };
 
@@ -57,8 +59,12 @@ const callGemini = async (prompt, options = {}) => {
         throw new Error('No content returned from Gemini');
       }
 
-      content = content.replace(/```json\n?|\n?```/g, '').trim();
-      return JSON.parse(content);
+      if (mimeType === 'application/json') {
+        content = content.replace(/```json\n?|\n?```/g, '').trim();
+        return JSON.parse(content);
+      }
+      
+      return content;
       
     } catch (error) {
       if (attempt === retries || error.message.includes('Quota') || error.message.includes('Forbidden')) {

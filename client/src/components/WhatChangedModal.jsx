@@ -17,7 +17,7 @@ const WhatChangedModal = ({ isOpen, onClose, workspaceId }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post(`/research/history/${workspaceId}`);
+      const res = await api.get(`/research/history-diff/${workspaceId}`);
       setData(res.data.data);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to analyze history. Please try again.');

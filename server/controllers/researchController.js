@@ -363,14 +363,14 @@ export const runDebateStage = async (req, res, next) => {
     if (stage === 'pro') {
       prompt = `You are the PRO Agent in an academic debate. Your goal is to vigorously defend and support the following research finding: "${finding}"
 Produce a strong, logical argument (1-2 paragraphs) that validates this claim. Do not hallucinate data, rely on general logical principles and standard industry knowledge.`;
-      result = await callGemini(prompt, { temperature: 0.7, retries: 1 });
+      result = await callGemini(prompt, { temperature: 0.7, retries: 1, responseMimeType: 'text/plain' });
     } 
     else if (stage === 'counter') {
       prompt = `You are the COUNTER Agent in an academic debate.
 Topic: "${finding}"
 Pro Argument: "${proArgument}"
 Your goal is to challenge this claim, identify weaknesses, counterexamples, or alternative perspectives. Produce a strong, logical counterargument (1-2 paragraphs).`;
-      result = await callGemini(prompt, { temperature: 0.7, retries: 1 });
+      result = await callGemini(prompt, { temperature: 0.7, retries: 1, responseMimeType: 'text/plain' });
     }
     else if (stage === 'evidence') {
       const [searchResults, ragResults] = await Promise.all([
@@ -381,7 +381,7 @@ Your goal is to challenge this claim, identify weaknesses, counterexamples, or a
       const docContext = (ragResults || []).map(d => d.text).join('\n');
       
       prompt = `You are the EVIDENCE Agent in an academic debate.\nTopic: "${finding}"\nPro Argument: "${proArgument}"\nCounter Argument: "${counterArgument}"\n\nAvailable Evidence:\nWEB SOURCES:\n${webContext}\nDOCUMENT CONTEXT:\n${docContext}\n\nAnalyze the arguments against the available evidence. Which points are factually supported by the evidence? Which are unverified? Provide an objective evidence check (1-2 paragraphs). Return ONLY text, no markdown headers unless necessary.`;
-      result = await callGemini(prompt, { temperature: 0.3, retries: 1 });
+      result = await callGemini(prompt, { temperature: 0.3, retries: 1, responseMimeType: 'text/plain' });
     }
     else if (stage === 'judge') {
       prompt = `You are the JUDGE Agent in a research debate.
@@ -397,7 +397,7 @@ Evaluate the entire debate. You must output a JSON object exactly matching this 
   "keyReasons": ["Reason 1", "Reason 2", "Reason 3"],
   "finalVerdict": "A 1-2 paragraph final ruling explaining the conclusion."
 }`;
-      const rawResult = await callGemini(prompt, { temperature: 0.3, retries: 1 });
+      const rawResult = await callGemini(prompt, { temperature: 0.3, retries: 1, responseMimeType: 'application/json' });
       
       try {
         const jsonMatch = rawResult.match(/\{[\s\S]*\}/);

@@ -43,6 +43,7 @@ export const saveInsight = async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({ success: false, message: 'Insight already saved from this workspace' });
     }
+    console.error("Save Insight Error:", error);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

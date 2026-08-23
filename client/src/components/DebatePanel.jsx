@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Swords, Check, Gavel, FileSearch, Target, Search, AlertCircle, Copy, BookMarked, RefreshCw, Loader2, Play, ChevronDown } from 'lucide-react';
 import api from '../services/api.js';
@@ -325,10 +325,10 @@ const DebatePanel = ({ workspaceId, results, onSaveInsight, initialFinding }) =>
                   </div>
                   
                   <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <button onClick={() => onSaveInsight(verdict.finalVerdict)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs font-bold text-gray-900 bg-white hover:bg-gray-100 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors">
+                    <button onClick={() => onSaveInsight(getMarkdownText(verdict.finalVerdict))} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs font-bold text-gray-900 bg-white hover:bg-gray-100 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors">
                       <BookMarked className="w-4 h-4" /> Save
                     </button>
-                    <button onClick={() => copyToClipboard(verdict.finalVerdict)} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs font-bold text-white bg-gray-800 hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors">
+                    <button onClick={() => copyToClipboard(getMarkdownText(verdict.finalVerdict))} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs font-bold text-white bg-gray-800 hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors">
                       <Copy className="w-4 h-4" /> Copy
                     </button>
                   </div>
