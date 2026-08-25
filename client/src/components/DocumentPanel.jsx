@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { documentService } from '../services/featuresService.js';
-import { FileText, Upload, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { useState, useEffect, useCallback } from "react";
+import { documentService } from "../services/featuresService.js";
+import { FileText, Upload, Loader2, CheckCircle2, AlertCircle, Clock, Trash2 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 const DocumentPanel = ({ workspaceId }) => {
   const [documents, setDocuments] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState(null);
 
   const fetchDocs = useCallback(async () => {
@@ -33,18 +34,35 @@ const DocumentPanel = ({ workspaceId }) => {
       await documentService.uploadDocument(workspaceId, file);
       fetchDocs();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to upload document');
+      setError(err.response?.data?.message || "Failed to upload document");
     } finally {
       setUploading(false);
       e.target.value = null;
     }
   };
 
+  const handleDelete = async (docId) => {
+    if (!window.confirm("Are you sure you want to delete this document? This will remove its data from the workspace and RAG index.")) {
+      return;
+    }
+    
+    setDeletingId(docId);
+    setError(null);
+    try {
+      await documentService.deleteDocument(workspaceId, docId);
+      await fetchDocs();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete document");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const getStatusIcon = (status) => {
     switch(status) {
-      case 'indexed': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
-      case 'processing': return <Loader2 className="w-4 h-4 text-gray-900 dark:text-gray-100 animate-spin" />;
-      case 'failed': return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case "indexed": return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+      case "processing": return <Loader2 className="w-4 h-4 text-gray-900 dark:text-gray-100 animate-spin" />;
+      case "failed": return <AlertCircle className="w-4 h-4 text-red-500" />;
       default: return <Clock className="w-4 h-4 text-gray-400" />;
     }
   };
@@ -57,9 +75,9 @@ const DocumentPanel = ({ workspaceId }) => {
           <h3 className="font-semibold text-gray-900 dark:text-white">Documents & RAG</h3>
         </div>
         
-        <label className={`flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 text-xs font-medium rounded-lg cursor-pointer transition-colors shadow-sm ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+        <label className={`flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 text-xs font-medium rounded-lg cursor-pointer transition-colors shadow-sm ${uploading ? "opacity-50 cursor-not-allowed" : ""}`}>
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-          {uploading ? 'Uploading...' : 'Upload PDF/TXT'}
+          {uploading ? "Uploading..." : "Upload PDF/TXT"}
           <input type="file" className="hidden" accept=".pdf,.txt" onChange={handleFileUpload} disabled={uploading} />
         </label>
       </div>
@@ -82,22 +100,32 @@ const DocumentPanel = ({ workspaceId }) => {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-200 truncate">{doc.name}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] font-semibold text-gray-500 uppercase">{doc.type.split('/')[1] || 'TXT'}</span>
-                  <span className="text-[10px] text-gray-400">•</span>
+                  <span className="text-[10px] font-semibold text-gray-500 uppercase">{doc.type.split("/")[1] || "TXT"}</span>
+                  <span className="text-[10px] text-gray-400">&bull;</span>
                   <span className="text-[10px] text-gray-500">{(doc.size / 1024).toFixed(1)} KB</span>
-                  <span className="text-[10px] text-gray-400">•</span>
+                  <span className="text-[10px] text-gray-400">&bull;</span>
                   <span className="text-[10px] text-gray-500">{formatDistanceToNow(new Date(doc.createdAt))} ago</span>
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center gap-1.5 shrink-0 ml-4 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 px-2 py-1 rounded-md">
-              {getStatusIcon(doc.status)}
-              <span className={`text-[10px] font-medium capitalize ${
-                doc.status === 'indexed' ? 'text-emerald-600 dark:text-emerald-400' :
-                doc.status === 'processing' ? 'text-gray-900 dark:text-gray-100' :
-                doc.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-500'
-              }`}>{doc.status}</span>
+            <div className="flex items-center gap-3 shrink-0 ml-4">
+              <div className="flex items-center gap-1.5 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 px-2 py-1 rounded-md">
+                {getStatusIcon(doc.status)}
+                <span className={`text-[10px] font-medium capitalize ${
+                  doc.status === "indexed" ? "text-emerald-600 dark:text-emerald-400" :
+                  doc.status === "processing" ? "text-gray-900 dark:text-gray-100" :
+                  doc.status === "failed" ? "text-red-600 dark:text-red-400" : "text-gray-500"
+                }`}>{doc.status}</span>
+              </div>
+              <button
+                onClick={() => handleDelete(doc._id)}
+                disabled={deletingId === doc._id}
+                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
+                title="Delete document"
+              >
+                {deletingId === doc._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         ))}
@@ -107,3 +135,4 @@ const DocumentPanel = ({ workspaceId }) => {
 };
 
 export default DocumentPanel;
+

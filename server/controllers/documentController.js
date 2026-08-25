@@ -86,3 +86,43 @@ export const getDocuments = async (req, res, next) => {
     next(error);
   }
 };
+
+export const deleteDocument = async (req, res, next) => {
+  try {
+    const { workspaceId, documentId } = req.params;
+    
+    const doc = await Document.findOne({ _id: documentId, workspaceId, userId: req.user._id });
+    if (!doc) {
+      return next(new AppError('Document not found', 404));
+    }
+
+    try {
+      const { getPineconeIndex } = await import('../services/rag/pineconeClient.js');
+      const index = getPineconeIndex();
+      if (index) {
+        await index.deleteMany({ filter: { documentId: { $eq: documentId } } });
+      }
+    } catch (pineconeErr) {
+      console.warn('Pinecone deletion failed or not available:', pineconeErr.message);
+    }
+    
+    if (doc.path) {
+      try {
+        if (fs.existsSync(doc.path)) {
+          fs.unlinkSync(doc.path);
+        }
+      } catch (fsErr) {
+        console.warn('File deletion failed:', fsErr.message);
+      }
+    }
+
+    await Document.findByIdAndDelete(documentId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Document deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -9,6 +9,7 @@ export const documentService = {
     });
   },
   getDocuments: (workspaceId) => api.get(`/documents/${workspaceId}`),
+  deleteDocument: (workspaceId, documentId) => api.delete(`/documents/${workspaceId}/${documentId}`),
 };
 
 export const chatService = {
