@@ -3,6 +3,8 @@ import AgentLog from '../../models/AgentLog.js';
 import Source from '../../models/Source.js';
 import ResearchFinding from '../../models/ResearchFinding.js';
 import Report from '../../models/Report.js';
+import ResearchPlan from '../../models/ResearchPlan.js';
+import Workspace from '../../models/Workspace.js';
 import runPlannerAgent from './plannerAgent.js';
 import runResearcherAgent from './researcherAgent.js';
 import runAnalystAgent from './analystAgent.js';
@@ -112,6 +114,18 @@ const runResearchPipeline = async (run, plan, workspace) => {
     await updateAgentStatus(runId, 'analyst', 'completed');
     await logAgent(workspaceId, plan._id, 'analyst', 'completed', `Analyst found ${(analysisResult.patterns || []).length} patterns`);
 
+    // Persist intermediate analysis findings
+    await ResearchFinding.findOneAndUpdate(
+      { researchRunId: runId },
+      {
+        workspaceId,
+        researchRunId: runId,
+        rawAnalysis: analysisResult.evidenceSummary || '',
+        insights: analysisResult.keyInsights || [],
+      },
+      { upsert: true, new: true }
+    );
+
     // ─── STEP 4: Fact Checker ───
     currentAgent = 'fact_checker';
     await updateAgentStatus(runId, 'fact_checker', 'running');
@@ -128,6 +142,13 @@ const runResearchPipeline = async (run, plan, workspace) => {
 
     await updateAgentStatus(runId, 'fact_checker', 'completed');
     await logAgent(workspaceId, plan._id, 'fact_checker', 'completed', `Fact checker verified ${validatedClaims.length} claims`);
+
+    // Persist verified claims to findings
+    await ResearchFinding.findOneAndUpdate(
+      { researchRunId: runId },
+      { claims: validatedClaims },
+      { upsert: true, new: true }
+    );
 
     // ─── STEP 5: Synthesizer ───
     currentAgent = 'synthesizer';
@@ -153,16 +174,20 @@ const runResearchPipeline = async (run, plan, workspace) => {
     await logAgent(workspaceId, plan._id, 'synthesizer', 'completed', `Synthesizer produced ${(synthesisResult.keyFindings || []).length} findings`);
 
     // ─── Save final findings ───
-    await ResearchFinding.create({
-      workspaceId,
-      researchRunId: runId,
-      summary: synthesisResult.summary,
-      keyFindings: synthesisResult.keyFindings,
-      insights: synthesisResult.insights,
-      limitations: synthesisResult.limitations,
-      claims: validatedClaims,
-      rawAnalysis: analysisResult.evidenceSummary || '',
-    });
+    await ResearchFinding.findOneAndUpdate(
+      { researchRunId: runId },
+      {
+        workspaceId,
+        researchRunId: runId,
+        summary: synthesisResult.summary,
+        keyFindings: synthesisResult.keyFindings,
+        insights: synthesisResult.insights,
+        limitations: synthesisResult.limitations,
+        claims: validatedClaims,
+        rawAnalysis: analysisResult.evidenceSummary || '',
+      },
+      { upsert: true, new: true }
+    );
 
     // ─── Save final report (prevent duplicates for this run) ───
     await Report.deleteMany({ researchRunId: runId });
@@ -222,7 +247,138 @@ const runResearchPipeline = async (run, plan, workspace) => {
   }
 };
 
-const startResearchRun = async (workspace, plan, userId) => {
+/**
+ * Resumes the Synthesizer stage if it was suspended or stalled.
+ * Atomically claims execution to prevent duplicate executions across polling requests.
+ */
+export const resumeSynthesizerStage = async (runId, workspaceId) => {
+  const claimedRun = await ResearchRun.findOneAndUpdate(
+    {
+      _id: runId,
+      status: 'running',
+      'agentStatuses': {
+        $elemMatch: { agent: 'synthesizer', status: 'pending' },
+      },
+    },
+    {
+      $set: {
+        'agentStatuses.$[elem].status': 'running',
+        'agentStatuses.$[elem].startedAt': new Date(),
+      },
+    },
+    {
+      arrayFilters: [{ 'elem.agent': 'synthesizer' }],
+      new: true,
+    }
+  );
+
+  if (!claimedRun) {
+    return;
+  }
+
+  console.log(`[Research Pipeline] Resuming synthesizer stage for run: ${runId}`);
+
+  try {
+    const [workspace, planDoc, sources, existingFinding] = await Promise.all([
+      Workspace.findById(workspaceId),
+      ResearchPlan.findById(claimedRun.researchPlanId),
+      Source.find({ researchRunId: runId }),
+      ResearchFinding.findOne({ researchRunId: runId }),
+    ]);
+
+    const researchQuestion = planDoc?.researchQuestion || workspace?.researchQuestion || workspace?.title || 'Research Analysis';
+    const context = {
+      domain: workspace?.researchDomain,
+      objective: planDoc?.objective || workspace?.researchObjective,
+    };
+
+    const analysisResult = {
+      patterns: existingFinding?.insights || [],
+      evidenceSummary: existingFinding?.rawAnalysis || '',
+      keyInsights: existingFinding?.insights || [],
+    };
+
+    const factCheckResult = {
+      claims: existingFinding?.claims || [],
+    };
+
+    const synthesisResult = await runSynthesizerAgent(
+      researchQuestion, sources, analysisResult, factCheckResult, context
+    );
+
+    if (planDoc && Array.isArray(planDoc.tasks)) {
+      planDoc.tasks.forEach((t) => { if (t.agentType === 'synthesizer') t.status = 'completed'; });
+      await planDoc.save();
+    }
+
+    await updateAgentStatus(runId, 'synthesizer', 'completed');
+    await logAgent(workspaceId, claimedRun.researchPlanId, 'synthesizer', 'completed', `Synthesizer produced ${(synthesisResult.keyFindings || []).length} findings`);
+
+    await ResearchFinding.findOneAndUpdate(
+      { researchRunId: runId },
+      {
+        workspaceId,
+        researchRunId: runId,
+        summary: synthesisResult.summary,
+        keyFindings: synthesisResult.keyFindings,
+        insights: synthesisResult.insights,
+        limitations: synthesisResult.limitations,
+        claims: existingFinding?.claims || [],
+        rawAnalysis: analysisResult.evidenceSummary,
+      },
+      { upsert: true, new: true }
+    );
+
+    await Report.deleteMany({ researchRunId: runId });
+    await Report.create({
+      workspaceId,
+      userId: claimedRun.userId,
+      researchRunId: runId,
+      title: synthesisResult.title || `${workspace?.title || 'Research'} - Final Report`,
+      executiveSummary: synthesisResult.summary || '',
+      researchQuestion,
+      methodology: synthesisResult.methodology || 'Multi-agent AI research pipeline with web search, pattern analysis, and fact-checking.',
+      keyFindings: synthesisResult.keyFindings || [],
+      detailedAnalysis: synthesisResult.detailedAnalysis || analysisResult.evidenceSummary || '',
+      limitations: synthesisResult.limitations || [],
+      conclusion: synthesisResult.conclusion || '',
+      references: sources.map((s) => ({
+        title: s.title,
+        url: s.url,
+        publisher: s.publisher,
+      })),
+      markdown: synthesisResult.markdown,
+    });
+
+    await ResearchRun.findByIdAndUpdate(runId, {
+      $set: {
+        status: 'completed',
+        completedAt: new Date(),
+        error: '',
+      },
+    });
+
+    if (workspace && workspace.status !== 'completed') {
+      workspace.status = 'active';
+      await workspace.save();
+    }
+
+    console.log(`[Research Pipeline] Resumed synthesizer stage for run ${runId} completed successfully.`);
+  } catch (error) {
+    const errorMsg = error.message || 'Resumed synthesizer stage failed';
+    console.error(`[Research Pipeline] Resume synthesizer failed for run ${runId}:`, errorMsg);
+    await updateAgentStatus(runId, 'synthesizer', 'failed', errorMsg);
+    await ResearchRun.findByIdAndUpdate(runId, {
+      $set: {
+        status: 'failed',
+        error: errorMsg,
+        completedAt: new Date(),
+      },
+    });
+  }
+};
+
+export const startResearchRun = async (workspace, plan, userId) => {
   const run = await ResearchRun.create({
     workspaceId: workspace._id,
     userId,
@@ -254,4 +410,5 @@ const startResearchRun = async (workspace, plan, userId) => {
   return run;
 };
 
+export { runResearchPipeline };
 export default startResearchRun;

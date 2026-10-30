@@ -6,7 +6,7 @@ import Source from '../models/Source.js';
 import AgentLog from '../models/AgentLog.js';
 import AppError from '../utils/AppError.js';
 import runPlannerAgent from '../services/agents/plannerAgent.js';
-import startResearchRun from '../services/agents/researchOrchestrator.js';
+import startResearchRun, { resumeSynthesizerStage } from '../services/agents/researchOrchestrator.js';
 
 // ─── Planner endpoints (Part 3 — preserved) ───
 
@@ -200,10 +200,25 @@ export const getRun = async (req, res, next) => {
     }
 
     // Get the latest run
-    const run = await ResearchRun.findOne({
+    let run = await ResearchRun.findOne({
       workspaceId,
       userId: req.user._id,
     }).sort({ createdAt: -1 });
+
+    // If run is running and synthesizer is pending while fact_checker completed, resume synthesizer
+    if (run && run.status === 'running') {
+      const factCheckerStatus = run.agentStatuses.find((a) => a.agent === 'fact_checker')?.status;
+      const synthesizerStatus = run.agentStatuses.find((a) => a.agent === 'synthesizer')?.status;
+
+      if (factCheckerStatus === 'completed' && synthesizerStatus === 'pending') {
+        try {
+          await resumeSynthesizerStage(run._id, workspace._id);
+          run = await ResearchRun.findById(run._id);
+        } catch (resumeErr) {
+          console.error(`[Research Controller] Failed to auto-resume synthesizer for run ${run._id}:`, resumeErr.message);
+        }
+      }
+    }
 
     // Get all runs for history
     const runs = await ResearchRun.find({

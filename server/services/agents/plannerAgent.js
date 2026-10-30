@@ -45,42 +45,94 @@ Return ONLY valid JSON. No additional text.`;
 };
 
 /**
- * Validate the planner output from Gemini.
+ * Validate and sanitize the planner output from Gemini.
  */
-const validatePlannerOutput = (data) => {
-  if (!data || typeof data !== 'object') {
-    throw new Error('Invalid planner output: expected an object');
+const validatePlannerOutput = (data, researchQuestion = '') => {
+  const safeData = data && typeof data === 'object' ? data : {};
+
+  // Extract objective with fallbacks
+  let objective = safeData.objective || safeData.goal || safeData.research_objective || safeData.title;
+  if (!objective || typeof objective !== 'string' || !objective.trim()) {
+    objective = `Conduct comprehensive research to answer: "${researchQuestion || 'the research question'}"`;
   }
 
-  if (!data.objective || typeof data.objective !== 'string') {
-    throw new Error('Invalid planner output: missing or invalid objective');
+  // Extract sub-questions with fallbacks
+  const rawSubQuestions = safeData.subQuestions || safeData.sub_questions || safeData.subquestions || safeData.questions || [];
+  let subQuestions = Array.isArray(rawSubQuestions)
+    ? rawSubQuestions.filter((q) => typeof q === 'string' && q.trim()).map((q) => q.trim())
+    : [];
+
+  if (subQuestions.length === 0) {
+    const topic = researchQuestion ? `for "${researchQuestion}"` : 'for the research objective';
+    subQuestions = [
+      `What are the core background, definitions, and state-of-the-art developments ${topic}?`,
+      `What are the key technical architectures, methodologies, and best practices?`,
+      `What are the critical trade-offs, challenges, and future trajectories?`,
+    ];
   }
 
-  if (!Array.isArray(data.subQuestions) || data.subQuestions.length < 1) {
-    throw new Error('Invalid planner output: missing or empty subQuestions');
+  // Extract tasks with fallbacks
+  const rawTasks = safeData.tasks || safeData.researchTasks || safeData.plan || safeData.steps || [];
+  let tasks = Array.isArray(rawTasks) ? rawTasks : [];
+
+  if (tasks.length === 0) {
+    tasks = [
+      {
+        title: 'Comprehensive Source Collection',
+        description: 'Search academic literature, documentation, and web sources for primary evidence.',
+        agentType: 'researcher',
+        priority: 'high',
+      },
+      {
+        title: 'Cross-Source Pattern & Trend Analysis',
+        description: 'Examine gathered data to extract core patterns, identify agreements, and detect contradictions.',
+        agentType: 'analyst',
+        priority: 'high',
+      },
+      {
+        title: 'Claim Verification & Evidence Auditing',
+        description: 'Validate key technical claims and evaluate confidence levels against verified sources.',
+        agentType: 'fact_checker',
+        priority: 'medium',
+      },
+      {
+        title: 'Final Report Synthesis',
+        description: 'Assemble findings, methodologies, and limitations into a structured comprehensive report.',
+        agentType: 'synthesizer',
+        priority: 'high',
+      },
+    ];
   }
 
-  if (!Array.isArray(data.tasks) || data.tasks.length < 1) {
-    throw new Error('Invalid planner output: missing or empty tasks');
-  }
+  // Map and sanitize each task
+  const validatedTasks = tasks.map((task, index) => {
+    const rawTitle = task.title || task.name || task.task || task.task_title || (typeof task === 'string' ? task : '');
+    const title = (rawTitle && typeof rawTitle === 'string' && rawTitle.trim())
+      ? rawTitle.trim()
+      : `Research Task ${index + 1}`;
 
-  // Validate and sanitize each task
-  const validatedTasks = data.tasks.map((task, index) => {
-    if (!task.title || typeof task.title !== 'string') {
-      throw new Error(`Invalid task at index ${index}: missing title`);
+    const rawDesc = task.description || task.details || task.summary || '';
+    const description = typeof rawDesc === 'string' ? rawDesc.trim() : '';
+
+    let agentType = (typeof task.agentType === 'string' ? task.agentType.toLowerCase().trim() : '');
+    if (agentType === 'research' || agentType === 'search') agentType = 'researcher';
+    if (agentType === 'analysis' || agentType === 'analyze') agentType = 'analyst';
+    if (agentType === 'factcheck' || agentType === 'fact_check' || agentType === 'verify') agentType = 'fact_checker';
+    if (agentType === 'synthesis' || agentType === 'synthesize') agentType = 'synthesizer';
+
+    if (!VALID_AGENT_TYPES.includes(agentType)) {
+      // Assign sensible agent type based on order if unrecognized
+      agentType = VALID_AGENT_TYPES[index % VALID_AGENT_TYPES.length];
     }
 
-    const agentType = VALID_AGENT_TYPES.includes(task.agentType)
-      ? task.agentType
-      : 'researcher';
-
-    const priority = VALID_PRIORITIES.includes(task.priority)
-      ? task.priority
-      : 'medium';
+    let priority = typeof task.priority === 'string' ? task.priority.toLowerCase().trim() : 'medium';
+    if (!VALID_PRIORITIES.includes(priority)) {
+      priority = 'medium';
+    }
 
     return {
-      title: task.title.trim(),
-      description: (task.description || '').trim(),
+      title,
+      description,
       agentType,
       priority,
       status: 'pending',
@@ -88,11 +140,8 @@ const validatePlannerOutput = (data) => {
   });
 
   return {
-    objective: data.objective.trim(),
-    subQuestions: data.subQuestions
-      .filter((q) => typeof q === 'string' && q.trim())
-      .map((q) => q.trim())
-      .slice(0, 6),
+    objective: objective.trim(),
+    subQuestions: subQuestions.slice(0, 6),
     tasks: validatedTasks,
   };
 };
@@ -102,8 +151,8 @@ const validatePlannerOutput = (data) => {
  */
 const runPlannerAgent = async (researchQuestion, context = {}) => {
   const prompt = buildPlannerPrompt(researchQuestion, context);
-  const rawOutput = await callGemini(prompt, { temperature: 0.7 });
-  const validatedPlan = validatePlannerOutput(rawOutput);
+  const rawOutput = await callGemini(prompt, { temperature: 0.7, maxTokens: 4096 });
+  const validatedPlan = validatePlannerOutput(rawOutput, researchQuestion);
   return validatedPlan;
 };
 

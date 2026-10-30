@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import mongoose from 'mongoose';
 
 // Global cache for serverless environments (Vercel)
@@ -12,18 +15,14 @@ const connectDB = async () => {
     return cached.conn;
   }
 
-  if (!process.env.MONGODB_URI) {
-    console.warn('MONGODB_URI is not defined in environment variables');
-    throw new Error('MONGODB_URI is required');
-  }
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/research-workspace';
 
   if (!cached.promise) {
-    // Mongoose options for serverless
     const opts = {
-      bufferCommands: false, // Disable buffering to immediately throw errors if disconnected
+      bufferCommands: true, // Allow Mongoose to buffer commands while connecting
     };
 
-    cached.promise = mongoose.connect(process.env.MONGODB_URI, opts).then((mongooseInstance) => {
+    cached.promise = mongoose.connect(uri, opts).then((mongooseInstance) => {
       console.log(`MongoDB connected successfully: ${mongooseInstance.connection.host}`);
       return mongooseInstance;
     }).catch((error) => {

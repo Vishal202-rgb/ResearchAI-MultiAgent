@@ -4,31 +4,35 @@ const cleanAndParseJson = (content) => {
   if (typeof content !== 'string') return content;
 
   let cleaned = content.trim();
-  // Strip ```json ... ``` or ``` ... ```
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.slice(7);
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.slice(3);
-  }
-  if (cleaned.endsWith('```')) {
-    cleaned = cleaned.slice(0, -3);
-  }
-  cleaned = cleaned.trim();
 
+  // 1. Try direct parse first
   try {
     return JSON.parse(cleaned);
-  } catch (err) {
-    // Attempt to extract the outermost JSON object or array
-    const match = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch (innerErr) {
-        // Fall through to error
-      }
-    }
-    throw new Error(`Failed to parse JSON response from Gemini: ${err.message}. Content was: ${cleaned.slice(0, 150)}...`);
+  } catch (e) {
+    // continue
   }
+
+  // 2. Strip markdown code fence if present
+  const markdownBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (markdownBlockMatch && markdownBlockMatch[1]) {
+    try {
+      return JSON.parse(markdownBlockMatch[1].trim());
+    } catch (e) {
+      // continue
+    }
+  }
+
+  // 3. Attempt to extract the outermost JSON object or array
+  const match = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (match) {
+    try {
+      return JSON.parse(match[0].trim());
+    } catch (innerErr) {
+      // continue
+    }
+  }
+
+  throw new Error(`Failed to parse JSON response from Gemini. Content was: ${cleaned.slice(0, 150)}...`);
 };
 
 const callGemini = async (prompt, options = {}) => {
