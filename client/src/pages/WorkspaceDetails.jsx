@@ -272,7 +272,7 @@ const WorkspaceDetails = () => {
             fetchResults(id);
             setToast({ message: 'Research completed successfully!', type: 'success' });
           } else {
-            setToast({ message: 'Research run failed', type: 'error' });
+            setToast({ message: res.run?.error ? `Research failed: ${res.run.error}` : 'Research run failed', type: 'error' });
           }
         }
       }, 3000);
@@ -446,10 +446,40 @@ const WorkspaceDetails = () => {
                   <h3 className="text-sm font-medium text-gray-900 dark:text-white">AI Planner Working...</h3>
                 </div>
               )}
-              {hasPlan && !isRunning && !hasResults && (
+              {hasPlan && !isRunning && !hasResults && run?.status !== 'failed' && (
                 <button onClick={handleExecuteResearch} className="w-full flex items-center justify-center gap-2 py-3 bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 text-sm font-medium rounded-lg shadow-sm transition-colors">
                   <Play className="w-4 h-4 fill-current" /> Execute Multi-Agent Research
                 </button>
+              )}
+
+              {/* Failed Status */}
+              {run && run.status === 'failed' && !isRunning && (
+                <div className="bg-white dark:bg-[#111111] border border-red-200 dark:border-red-900/50 rounded-xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      <div>
+                        <h2 className="text-base font-semibold text-red-900 dark:text-red-200">Research Run Failed</h2>
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{run.error || 'An error occurred during multi-agent research execution.'}</p>
+                      </div>
+                    </div>
+                    <button onClick={handleExecuteResearch} className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-xs font-medium rounded-lg transition-colors shadow-sm">
+                      <RefreshCw className="w-3.5 h-3.5" /> Retry Research
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {run.agentStatuses?.map((s, idx) => (
+                      <div key={idx} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-800/50">
+                        {s.status === 'completed' && <CheckCircle2 className="text-emerald-500 w-4 h-4" />}
+                        {s.status === 'running' && <Loader2 className="text-gray-900 dark:text-white animate-spin w-4 h-4" />}
+                        {s.status === 'failed' && <X className="text-red-500 w-4 h-4" />}
+                        {s.status === 'pending' && <Circle className="text-gray-400 w-4 h-4" />}
+                        <span className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-200">{agentTypeLabels[s.agent] || s.agent}</span>
+                        <span className={`text-xs capitalize ${s.status === 'failed' ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>{s.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* Running Status */}
@@ -467,9 +497,10 @@ const WorkspaceDetails = () => {
                       <div key={idx} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-800/50">
                         {s.status === 'completed' && <CheckCircle2 className="text-emerald-500 w-4 h-4" />}
                         {s.status === 'running' && <Loader2 className="text-gray-900 dark:text-white animate-spin w-4 h-4" />}
+                        {s.status === 'failed' && <X className="text-red-500 w-4 h-4" />}
                         {s.status === 'pending' && <Circle className="text-gray-400 w-4 h-4" />}
                         <span className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-200">{agentTypeLabels[s.agent] || s.agent}</span>
-                        <span className="text-xs text-gray-500 capitalize">{s.status}</span>
+                        <span className={`text-xs capitalize ${s.status === 'failed' ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>{s.status}</span>
                       </div>
                     ))}
                   </div>

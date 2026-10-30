@@ -2,6 +2,7 @@ import ResearchRun from '../../models/ResearchRun.js';
 import AgentLog from '../../models/AgentLog.js';
 import Source from '../../models/Source.js';
 import ResearchFinding from '../../models/ResearchFinding.js';
+import Report from '../../models/Report.js';
 import runPlannerAgent from './plannerAgent.js';
 import runResearcherAgent from './researcherAgent.js';
 import runAnalystAgent from './analystAgent.js';
@@ -10,28 +11,46 @@ import runSynthesizerAgent from './synthesizerAgent.js';
 
 const AGENTS = ['planner', 'researcher', 'analyst', 'fact_checker', 'synthesizer'];
 
-const updateAgentStatus = async (run, agentName, status, error = '') => {
-  const agentEntry = run.agentStatuses.find((a) => a.agent === agentName);
-  if (agentEntry) {
-    agentEntry.status = status;
-    if (status === 'running') agentEntry.startedAt = new Date();
-    if (status === 'completed' || status === 'failed') agentEntry.completedAt = new Date();
-    if (error) agentEntry.error = error;
+const updateAgentStatus = async (runId, agentName, status, error = '') => {
+  const updateFields = {
+    'agentStatuses.$[elem].status': status,
+  };
+  if (status === 'running') {
+    updateFields['agentStatuses.$[elem].startedAt'] = new Date();
   }
-  await run.save();
+  if (status === 'completed' || status === 'failed') {
+    updateFields['agentStatuses.$[elem].completedAt'] = new Date();
+  }
+  if (error !== undefined) {
+    updateFields['agentStatuses.$[elem].error'] = error;
+  }
+
+  const updatedRun = await ResearchRun.findByIdAndUpdate(
+    runId,
+    { $set: updateFields },
+    {
+      arrayFilters: [{ 'elem.agent': agentName }],
+      new: true,
+    }
+  );
+  return updatedRun;
 };
 
 const logAgent = async (workspaceId, researchPlanId, agentType, status, message, error = '') => {
-  await AgentLog.create({
-    workspaceId,
-    researchPlanId,
-    agentType,
-    status,
-    message,
-    error,
-    startedAt: status === 'started' ? new Date() : undefined,
-    completedAt: status !== 'started' ? new Date() : undefined,
-  });
+  try {
+    return await AgentLog.create({
+      workspaceId,
+      researchPlanId,
+      agentType,
+      status, // 'started', 'completed', or 'failed'
+      message,
+      error,
+      startedAt: status === 'started' ? new Date() : undefined,
+      completedAt: status !== 'started' ? new Date() : undefined,
+    });
+  } catch (err) {
+    console.error(`[Research Pipeline] Failed to log agent ${agentType} (${status}):`, err.message);
+  }
 };
 
 const runResearchPipeline = async (run, plan, workspace) => {
@@ -42,22 +61,27 @@ const runResearchPipeline = async (run, plan, workspace) => {
     objective: plan.objective || workspace.researchObjective,
   };
 
+  let currentAgent = null;
+
   try {
     // ─── STEP 1: Planner ───
-    await updateAgentStatus(run, 'planner', 'running');
+    currentAgent = 'planner';
+    await updateAgentStatus(runId, 'planner', 'running');
     await logAgent(workspaceId, plan._id, 'planner', 'started', 'Planner using existing plan');
 
-    await updateAgentStatus(run, 'planner', 'completed');
+    await updateAgentStatus(runId, 'planner', 'completed');
     await logAgent(workspaceId, plan._id, 'planner', 'completed', `Planner: ${plan.tasks.length} tasks`);
 
     // ─── STEP 2: Researcher ───
-    await updateAgentStatus(run, 'researcher', 'running');
+    currentAgent = 'researcher';
+    await updateAgentStatus(runId, 'researcher', 'running');
     await logAgent(workspaceId, plan._id, 'researcher', 'started', 'Researcher agent started (Batched/Optimized)');
 
     const researcherResult = await runResearcherAgent(plan.tasks, researchQuestion, context);
+    const collectedSources = Array.isArray(researcherResult?.sources) ? researcherResult.sources : [];
 
-    if (researcherResult.sources.length > 0) {
-      const sourceDocs = researcherResult.sources.map((s) => ({
+    if (collectedSources.length > 0) {
+      const sourceDocs = collectedSources.map((s) => ({
         workspaceId,
         researchRunId: runId,
         ...s,
@@ -68,52 +92,64 @@ const runResearchPipeline = async (run, plan, workspace) => {
     plan.tasks.forEach((t) => { if (t.agentType === 'researcher') t.status = 'completed'; });
     await plan.save();
 
-    await updateAgentStatus(run, 'researcher', 'completed');
-    await logAgent(workspaceId, plan._id, 'researcher', 'completed', `Researcher collected ${researcherResult.sources.length} sources`);
+    await updateAgentStatus(runId, 'researcher', 'completed');
+    await logAgent(workspaceId, plan._id, 'researcher', 'completed', `Researcher collected ${collectedSources.length} sources`);
 
     // ─── STEP 3: Analyst ───
-    await updateAgentStatus(run, 'analyst', 'running');
+    currentAgent = 'analyst';
+    await updateAgentStatus(runId, 'analyst', 'running');
     await logAgent(workspaceId, plan._id, 'analyst', 'started', 'Analyst agent started (Dual-Role Optimized)');
 
     // Returns both analysis and factCheck properties to save API calls
     const analystOutput = await runAnalystAgent(
-      researchQuestion, researcherResult.sources, researcherResult.rawData, context
+      researchQuestion, collectedSources, researcherResult?.rawData || [], context
     );
-    const analysisResult = analystOutput.analysis || {};
+    const analysisResult = analystOutput?.analysis || {};
 
     plan.tasks.forEach((t) => { if (t.agentType === 'analyst') t.status = 'completed'; });
     await plan.save();
 
-    await updateAgentStatus(run, 'analyst', 'completed');
+    await updateAgentStatus(runId, 'analyst', 'completed');
     await logAgent(workspaceId, plan._id, 'analyst', 'completed', `Analyst found ${(analysisResult.patterns || []).length} patterns`);
 
     // ─── STEP 4: Fact Checker ───
-    await updateAgentStatus(run, 'fact_checker', 'running');
+    currentAgent = 'fact_checker';
+    await updateAgentStatus(runId, 'fact_checker', 'running');
     await logAgent(workspaceId, plan._id, 'fact_checker', 'started', 'Fact checker agent started (Optimized zero-call)');
 
     // Uses pre-computed fact check from the analyst output
     const factCheckResult = await runFactCheckerAgent(
-      researchQuestion, researcherResult.sources, analystOutput
+      researchQuestion, collectedSources, analystOutput
     );
+    const validatedClaims = Array.isArray(factCheckResult?.claims) ? factCheckResult.claims : [];
 
     plan.tasks.forEach((t) => { if (t.agentType === 'fact_checker') t.status = 'completed'; });
     await plan.save();
 
-    await updateAgentStatus(run, 'fact_checker', 'completed');
-    await logAgent(workspaceId, plan._id, 'fact_checker', 'completed', `Fact checker verified ${(factCheckResult.claims || []).length} claims`);
+    await updateAgentStatus(runId, 'fact_checker', 'completed');
+    await logAgent(workspaceId, plan._id, 'fact_checker', 'completed', `Fact checker verified ${validatedClaims.length} claims`);
 
     // ─── STEP 5: Synthesizer ───
-    await updateAgentStatus(run, 'synthesizer', 'running');
+    currentAgent = 'synthesizer';
+    console.log(`[Research Pipeline] Synthesizer execution started for run: ${runId}`);
+    await updateAgentStatus(runId, 'synthesizer', 'running');
     await logAgent(workspaceId, plan._id, 'synthesizer', 'started', 'Synthesizer agent started');
 
+    console.log(`[Research Pipeline] Input data received for synthesis:`, {
+      sourcesCount: collectedSources.length,
+      patternsCount: (analysisResult.patterns || []).length,
+      claimsCount: validatedClaims.length,
+      objective: context.objective || 'None',
+    });
+
     const synthesisResult = await runSynthesizerAgent(
-      researchQuestion, researcherResult.sources, analysisResult, factCheckResult, context
+      researchQuestion, collectedSources, analysisResult, factCheckResult, context
     );
 
     plan.tasks.forEach((t) => { if (t.agentType === 'synthesizer') t.status = 'completed'; });
     await plan.save();
 
-    await updateAgentStatus(run, 'synthesizer', 'completed');
+    await updateAgentStatus(runId, 'synthesizer', 'completed');
     await logAgent(workspaceId, plan._id, 'synthesizer', 'completed', `Synthesizer produced ${(synthesisResult.keyFindings || []).length} findings`);
 
     // ─── Save final findings ───
@@ -124,31 +160,65 @@ const runResearchPipeline = async (run, plan, workspace) => {
       keyFindings: synthesisResult.keyFindings,
       insights: synthesisResult.insights,
       limitations: synthesisResult.limitations,
-      claims: factCheckResult.claims,
-      rawAnalysis: analysisResult.evidenceSummary,
+      claims: validatedClaims,
+      rawAnalysis: analysisResult.evidenceSummary || '',
     });
 
-    run.status = 'completed';
-    run.completedAt = new Date();
-    await run.save();
+    // ─── Save final report (prevent duplicates for this run) ───
+    await Report.deleteMany({ researchRunId: runId });
+    const finalReport = await Report.create({
+      workspaceId,
+      userId: run.userId,
+      researchRunId: runId,
+      title: synthesisResult.title || `${workspace.title || 'Research'} - Final Report`,
+      executiveSummary: synthesisResult.summary || '',
+      researchQuestion,
+      methodology: synthesisResult.methodology || 'Multi-agent AI research pipeline with web search, pattern analysis, and fact-checking.',
+      keyFindings: synthesisResult.keyFindings || [],
+      detailedAnalysis: synthesisResult.detailedAnalysis || analysisResult.evidenceSummary || '',
+      limitations: synthesisResult.limitations || [],
+      conclusion: synthesisResult.conclusion || '',
+      references: collectedSources.map((s) => ({
+        title: s.title,
+        url: s.url,
+        publisher: s.publisher,
+      })),
+      markdown: synthesisResult.markdown,
+    });
+    console.log(`[Research Pipeline] Final report successfully saved with ID: ${finalReport._id}`);
+
+    // Mark research run as completed
+    await ResearchRun.findByIdAndUpdate(runId, {
+      $set: {
+        status: 'completed',
+        completedAt: new Date(),
+        error: '',
+      }
+    });
 
     if (workspace.status !== 'completed') {
       workspace.status = 'active';
       await workspace.save();
     }
 
+    console.log(`[Research Pipeline] Research run ${runId} completed successfully.`);
+
   } catch (error) {
-    console.error('Research pipeline failed:', error.message);
-    const runningAgent = run.agentStatuses.find((a) => a.status === 'running');
-    if (runningAgent) {
-      await updateAgentStatus(run, runningAgent.agent, 'failed', error.message);
-      await logAgent(workspaceId, plan._id, runningAgent.agent, 'failed', `Agent failed: ${error.message}`, error.message);
+    const errorMsg = error.message || 'Unknown research pipeline failure';
+    console.error(`[Research Pipeline] Run ${runId} failed at agent "${currentAgent}":`, errorMsg);
+
+    if (currentAgent) {
+      await updateAgentStatus(runId, currentAgent, 'failed', errorMsg);
+      await logAgent(workspaceId, plan._id, currentAgent, 'failed', `Agent failed: ${errorMsg}`, errorMsg);
     }
 
-    run.status = 'failed';
-    run.error = error.message;
-    run.completedAt = new Date();
-    await run.save();
+    await ResearchRun.findByIdAndUpdate(runId, {
+      $set: {
+        status: 'failed',
+        error: errorMsg,
+        completedAt: new Date(),
+      }
+    });
   }
 };
 
@@ -165,7 +235,22 @@ const startResearchRun = async (workspace, plan, userId) => {
     })),
   });
 
-  runResearchPipeline(run, plan, workspace).catch(err => console.error(err));
+  // Run pipeline asynchronously in background with safety catch
+  runResearchPipeline(run, plan, workspace).catch(async (err) => {
+    console.error('[Research Pipeline] Unhandled background error in runResearchPipeline:', err.message);
+    try {
+      await ResearchRun.findByIdAndUpdate(run._id, {
+        $set: {
+          status: 'failed',
+          error: err.message || 'Pipeline execution failed unexpectedly',
+          completedAt: new Date(),
+        }
+      });
+    } catch (saveErr) {
+      console.error('Failed to mark run as failed after unhandled error:', saveErr.message);
+    }
+  });
+
   return run;
 };
 

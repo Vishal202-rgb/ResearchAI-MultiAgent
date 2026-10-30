@@ -161,7 +161,16 @@ export const startRun = async (req, res, next) => {
     });
 
     if (existingRun) {
-      return next(new AppError('A research run is already in progress', 400));
+      // If the running run is stale (> 5 minutes without completion), mark it failed
+      const isStale = (Date.now() - new Date(existingRun.updatedAt || existingRun.createdAt).getTime()) > 5 * 60 * 1000;
+      if (isStale) {
+        existingRun.status = 'failed';
+        existingRun.error = 'Previous run timed out or was interrupted';
+        existingRun.completedAt = new Date();
+        await existingRun.save();
+      } else {
+        return next(new AppError('A research run is already in progress', 400));
+      }
     }
 
     // Start the orchestrated research run (async)
