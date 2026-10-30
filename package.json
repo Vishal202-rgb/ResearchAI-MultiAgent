@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "cd client && npm install && npm run build",
+    "vercel-build": "cd client && npm install && npm run build",
     "start": "node server/server.js"
   },
   "dependencies": {
