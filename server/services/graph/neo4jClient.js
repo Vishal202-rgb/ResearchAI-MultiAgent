@@ -8,7 +8,7 @@ export const initNeo4j = () => {
   const password = process.env.NEO4J_PASSWORD;
 
   if (!uri || !user || !password) {
-    console.warn('Neo4j credentials not configured. Graph features will be disabled/simulated.');
+    console.warn('Neo4j credentials not configured. Graph features will use MongoDB persistence.');
     return null;
   }
 

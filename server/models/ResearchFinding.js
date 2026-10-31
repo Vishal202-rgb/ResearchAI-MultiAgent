@@ -32,6 +32,22 @@ const researchFindingSchema = new mongoose.Schema(
     limitations: [{ type: String }],
     claims: [claimSchema],
     rawAnalysis: { type: String, default: '' },
+    graph: {
+      nodes: [
+        {
+          id: { type: String },
+          label: { type: String, default: 'Concept' },
+          val: { type: Number, default: 1 },
+        },
+      ],
+      links: [
+        {
+          source: { type: String },
+          target: { type: String },
+          label: { type: String, default: 'RELATED_TO' },
+        },
+      ],
+    },
   },
   { timestamps: true }
 );

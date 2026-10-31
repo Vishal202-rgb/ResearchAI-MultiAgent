@@ -10,6 +10,7 @@ import runResearcherAgent from './researcherAgent.js';
 import runAnalystAgent from './analystAgent.js';
 import runFactCheckerAgent from './factCheckerAgent.js';
 import runSynthesizerAgent from './synthesizerAgent.js';
+import { buildGraphFromFindings } from '../graph/graphService.js';
 
 const AGENTS = ['planner', 'researcher', 'analyst', 'fact_checker', 'synthesizer'];
 
@@ -212,6 +213,12 @@ const runResearchPipeline = async (run, plan, workspace) => {
       markdown: synthesisResult.markdown,
     });
     console.log(`[Research Pipeline] Final report successfully saved with ID: ${finalReport._id}`);
+ 
+    // Trigger Knowledge Graph generation in background
+    const findingText = `Summary: ${synthesisResult.summary || ''}\nKey Findings: ${(synthesisResult.keyFindings || []).join('\n')}`;
+    buildGraphFromFindings(workspaceId, run.userId, findingText).catch((graphErr) => {
+      console.warn('[Research Pipeline] Background knowledge graph generation warning:', graphErr.message);
+    });
 
     // Mark research run as completed
     await ResearchRun.findByIdAndUpdate(runId, {
@@ -521,6 +528,12 @@ export const resumeSynthesizerStage = async (runId, workspaceId) => {
         publisher: s.publisher,
       })),
       markdown: synthesisResult.markdown,
+    });
+
+    // Trigger Knowledge Graph generation in background
+    const findingText = `Summary: ${synthesisResult.summary || ''}\nKey Findings: ${(synthesisResult.keyFindings || []).join('\n')}`;
+    buildGraphFromFindings(workspaceId, claimedRun.userId, findingText).catch((graphErr) => {
+      console.warn('[Research Pipeline] Background knowledge graph generation warning:', graphErr.message);
     });
 
     await ResearchRun.findByIdAndUpdate(runId, {
