@@ -249,17 +249,184 @@ const runResearchPipeline = async (run, plan, workspace) => {
 };
 
 /**
- * Resumes the Synthesizer stage if it was suspended or stalled.
- * Atomically claims execution to prevent duplicate executions across polling requests.
+ * Advances the Researcher stage atomically.
  */
-export const resumeSynthesizerStage = async (runId, workspaceId) => {
-  // Allow claiming if synthesizer is pending, OR if it has been marked running for > 25 seconds (stalled/frozen)
-  const staleThreshold = new Date(Date.now() - 25 * 1000);
+export const advanceResearcherStage = async (runId, workspaceId) => {
+  const staleThreshold = new Date(Date.now() - 5 * 1000);
 
   const claimedRun = await ResearchRun.findOneAndUpdate(
     {
       _id: runId,
       status: 'running',
+      $or: [
+        { 'agentStatuses': { $elemMatch: { agent: 'researcher', status: 'pending' } } },
+        { 'agentStatuses': { $elemMatch: { agent: 'researcher', status: 'running', startedAt: { $lt: staleThreshold } } } },
+      ],
+    },
+    {
+      $set: {
+        'agentStatuses.$[elem].status': 'running',
+        'agentStatuses.$[elem].startedAt': new Date(),
+        updatedAt: new Date(),
+      },
+    },
+    {
+      arrayFilters: [{ 'elem.agent': 'researcher' }],
+      new: true,
+    }
+  );
+
+  if (!claimedRun) return null;
+
+  try {
+    const [workspace, planDoc] = await Promise.all([
+      Workspace.findById(workspaceId),
+      ResearchPlan.findById(claimedRun.researchPlanId),
+    ]);
+
+    const researchQuestion = planDoc?.researchQuestion || workspace?.researchQuestion || workspace?.title || 'Research Analysis';
+    const context = {
+      domain: workspace?.researchDomain,
+      objective: planDoc?.objective || workspace?.researchObjective,
+    };
+
+    // Mark planner completed if pending
+    await updateAgentStatus(runId, 'planner', 'completed');
+
+    const researcherResult = await runResearcherAgent(planDoc?.tasks || [], researchQuestion, context);
+    const collectedSources = Array.isArray(researcherResult?.sources) ? researcherResult.sources : [];
+
+    // Save sources if collected (prevent duplicate insertions)
+    await Source.deleteMany({ researchRunId: runId });
+    if (collectedSources.length > 0) {
+      const sourceDocs = collectedSources.map((s) => ({
+        workspaceId,
+        researchRunId: runId,
+        ...s,
+      }));
+      await Source.insertMany(sourceDocs);
+    }
+
+    if (planDoc && Array.isArray(planDoc.tasks)) {
+      planDoc.tasks.forEach((t) => { if (t.agentType === 'researcher') t.status = 'completed'; });
+      await planDoc.save();
+    }
+
+    await updateAgentStatus(runId, 'researcher', 'completed');
+    await logAgent(workspaceId, claimedRun.researchPlanId, 'researcher', 'completed', `Researcher collected ${collectedSources.length} sources`);
+
+    return claimedRun;
+  } catch (error) {
+    const errorMsg = error.message || 'Researcher stage failed';
+    console.error(`[Research Pipeline] Advance researcher failed for run ${runId}:`, errorMsg);
+    await updateAgentStatus(runId, 'researcher', 'failed', errorMsg);
+    throw error;
+  }
+};
+
+/**
+ * Advances the Analyst & Fact Checker stage atomically.
+ */
+export const advanceAnalystStage = async (runId, workspaceId) => {
+  const staleThreshold = new Date(Date.now() - 5 * 1000);
+
+  const claimedRun = await ResearchRun.findOneAndUpdate(
+    {
+      _id: runId,
+      status: 'running',
+      'agentStatuses': {
+        $all: [
+          { $elemMatch: { agent: 'researcher', status: 'completed' } },
+        ],
+      },
+      $or: [
+        { 'agentStatuses': { $elemMatch: { agent: 'analyst', status: 'pending' } } },
+        { 'agentStatuses': { $elemMatch: { agent: 'analyst', status: 'running', startedAt: { $lt: staleThreshold } } } },
+      ],
+    },
+    {
+      $set: {
+        'agentStatuses.$[elem].status': 'running',
+        'agentStatuses.$[elem].startedAt': new Date(),
+        updatedAt: new Date(),
+      },
+    },
+    {
+      arrayFilters: [{ 'elem.agent': 'analyst' }],
+      new: true,
+    }
+  );
+
+  if (!claimedRun) return null;
+
+  try {
+    const [workspace, planDoc, sources] = await Promise.all([
+      Workspace.findById(workspaceId),
+      ResearchPlan.findById(claimedRun.researchPlanId),
+      Source.find({ researchRunId: runId }),
+    ]);
+
+    const researchQuestion = planDoc?.researchQuestion || workspace?.researchQuestion || workspace?.title || 'Research Analysis';
+    const context = {
+      domain: workspace?.researchDomain,
+      objective: planDoc?.objective || workspace?.researchObjective,
+    };
+
+    const analystOutput = await runAnalystAgent(researchQuestion, sources, [], context);
+    const analysisResult = analystOutput?.analysis || {};
+    const factCheckerResult = await runFactCheckerAgent(researchQuestion, sources, analystOutput);
+
+    if (planDoc && Array.isArray(planDoc.tasks)) {
+      planDoc.tasks.forEach((t) => {
+        if (t.agentType === 'analyst' || t.agentType === 'fact_checker') t.status = 'completed';
+      });
+      await planDoc.save();
+    }
+
+    await updateAgentStatus(runId, 'analyst', 'completed');
+    await updateAgentStatus(runId, 'fact_checker', 'completed');
+
+    await ResearchFinding.findOneAndUpdate(
+      { researchRunId: runId },
+      {
+        workspaceId,
+        researchRunId: runId,
+        summary: analysisResult.evidenceSummary || 'Analysis generated from collected sources.',
+        keyFindings: analysisResult.keyInsights || analysisResult.patterns || [],
+        insights: analysisResult.keyInsights || [],
+        limitations: analysisResult.gaps || [],
+        claims: factCheckerResult?.claims || [],
+        rawAnalysis: analysisResult.evidenceSummary || '',
+      },
+      { upsert: true, new: true }
+    );
+
+    return claimedRun;
+  } catch (error) {
+    const errorMsg = error.message || 'Analyst stage failed';
+    console.error(`[Research Pipeline] Advance analyst failed for run ${runId}:`, errorMsg);
+    await updateAgentStatus(runId, 'analyst', 'failed', errorMsg);
+    await updateAgentStatus(runId, 'fact_checker', 'failed', errorMsg);
+    throw error;
+  }
+};
+
+/**
+ * Resumes or advances the Synthesizer stage if it was suspended or stalled.
+ * Atomically claims execution to prevent duplicate executions across polling requests.
+ */
+export const resumeSynthesizerStage = async (runId, workspaceId) => {
+  const staleThreshold = new Date(Date.now() - 5 * 1000);
+
+  const claimedRun = await ResearchRun.findOneAndUpdate(
+    {
+      _id: runId,
+      status: 'running',
+      'agentStatuses': {
+        $all: [
+          { $elemMatch: { agent: 'fact_checker', status: 'completed' } },
+        ],
+      },
       $or: [
         { 'agentStatuses': { $elemMatch: { agent: 'synthesizer', status: 'pending' } } },
         { 'agentStatuses': { $elemMatch: { agent: 'synthesizer', status: 'running', startedAt: { $lt: staleThreshold } } } },
@@ -370,6 +537,7 @@ export const resumeSynthesizerStage = async (runId, workspaceId) => {
     }
 
     console.log(`[Research Pipeline] Resumed synthesizer stage for run ${runId} completed successfully.`);
+    return claimedRun;
   } catch (error) {
     const errorMsg = error.message || 'Resumed synthesizer stage failed';
     console.error(`[Research Pipeline] Resume synthesizer failed for run ${runId}:`, errorMsg);
@@ -381,7 +549,38 @@ export const resumeSynthesizerStage = async (runId, workspaceId) => {
         completedAt: new Date(),
       },
     });
+    throw error;
   }
+};
+
+/**
+ * Top-level advancement coordinator called on polling requests.
+ * Drives the pipeline forward stage by stage safely across serverless restarts.
+ */
+export const advancePipelineStage = async (runId, workspaceId) => {
+  const run = await ResearchRun.findById(runId);
+  if (!run || run.status !== 'running') return null;
+
+  const getStatus = (name) => run.agentStatuses.find((a) => a.agent === name)?.status;
+
+  const researcherStatus = getStatus('researcher');
+  const analystStatus = getStatus('analyst');
+  const factCheckerStatus = getStatus('fact_checker');
+  const synthesizerStatus = getStatus('synthesizer');
+
+  if (researcherStatus === 'pending' || researcherStatus === 'running') {
+    return await advanceResearcherStage(runId, workspaceId);
+  }
+
+  if (researcherStatus === 'completed' && (analystStatus === 'pending' || analystStatus === 'running')) {
+    return await advanceAnalystStage(runId, workspaceId);
+  }
+
+  if (factCheckerStatus === 'completed' && (synthesizerStatus === 'pending' || synthesizerStatus === 'running')) {
+    return await resumeSynthesizerStage(runId, workspaceId);
+  }
+
+  return null;
 };
 
 export const startResearchRun = async (workspace, plan, userId) => {
@@ -397,21 +596,27 @@ export const startResearchRun = async (workspace, plan, userId) => {
     })),
   });
 
-  // Run pipeline asynchronously in background with safety catch
-  runResearchPipeline(run, plan, workspace).catch(async (err) => {
-    console.error('[Research Pipeline] Unhandled background error in runResearchPipeline:', err.message);
-    try {
-      await ResearchRun.findByIdAndUpdate(run._id, {
-        $set: {
-          status: 'failed',
-          error: err.message || 'Pipeline execution failed unexpectedly',
-          completedAt: new Date(),
-        }
-      });
-    } catch (saveErr) {
-      console.error('Failed to mark run as failed after unhandled error:', saveErr.message);
-    }
-  });
+  // In non-serverless environments (standalone Node), run pipeline in background.
+  // In Vercel / serverless environments, unawaited promises freeze on response,
+  // so the pipeline is driven safely stage-by-stage by advancePipelineStage on client polling.
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.SERVERLESS);
+
+  if (!isServerless && !process.env.DISABLE_BACKGROUND_PIPELINE) {
+    runResearchPipeline(run, plan, workspace).catch(async (err) => {
+      console.error('[Research Pipeline] Unhandled background error in runResearchPipeline:', err.message);
+      try {
+        await ResearchRun.findByIdAndUpdate(run._id, {
+          $set: {
+            status: 'failed',
+            error: err.message || 'Pipeline execution failed unexpectedly',
+            completedAt: new Date(),
+          }
+        });
+      } catch (saveErr) {
+        console.error('Failed to mark run as failed after unhandled error:', saveErr.message);
+      }
+    });
+  }
 
   return run;
 };

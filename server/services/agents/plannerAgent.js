@@ -151,7 +151,13 @@ const validatePlannerOutput = (data, researchQuestion = '') => {
  */
 const runPlannerAgent = async (researchQuestion, context = {}) => {
   const prompt = buildPlannerPrompt(researchQuestion, context);
-  const rawOutput = await callGemini(prompt, { temperature: 0.7, maxTokens: 4096 });
+  let rawOutput = {};
+  try {
+    rawOutput = await callGemini(prompt, { temperature: 0.7, maxTokens: 4096, timeoutMs: 25000, retries: 1 });
+  } catch (err) {
+    console.warn(`[Planner Agent] Gemini API unavailable (${err.message}). Using fallback structured research plan.`);
+    rawOutput = {};
+  }
   const validatedPlan = validatePlannerOutput(rawOutput, researchQuestion);
   return validatedPlan;
 };

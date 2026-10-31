@@ -65,21 +65,29 @@ Return JSON in this format:
 }`;
 
   // 6. Generate response
+  let jsonResponse;
   try {
-    const jsonResponse = await callGemini(prompt, { temperature: 0.5, maxTokens: 4000 });
-
-    // 7. Save assistant message
-    const assistantMessage = await ChatMessage.create({
-      workspaceId,
-      userId,
-      role: 'assistant',
-      content: jsonResponse.reply || JSON.stringify(jsonResponse),
-      sources: jsonResponse.sources || []
-    });
-
-    return assistantMessage;
+    jsonResponse = await callGemini(prompt, { temperature: 0.5, maxTokens: 2500, timeoutMs: 25000, retries: 1 });
   } catch (error) {
-    console.error('Chat error:', error);
-    throw new Error('Failed to generate chat response');
+    console.warn(`[Chat] Gemini API unavailable (${error.message}). Providing fallback response from findings.`);
+    const fallbackReply = finding?.summary
+      ? `Based on the verified research findings for this workspace:\n\n${finding.summary}\n\n**Key Findings:**\n${(finding.keyFindings || []).map((kf, i) => `${i + 1}. ${kf}`).join('\n')}`
+      : `I have received your question: "${query}". Research findings are currently being synthesized for this workspace. Please review the Research tab for live agent progress.`;
+
+    jsonResponse = {
+      reply: fallbackReply,
+      sources: sources.slice(0, 3).map((s) => ({ title: s.title, snippet: s.snippet, url: s.url }))
+    };
   }
+
+  // 7. Save assistant message
+  const assistantMessage = await ChatMessage.create({
+    workspaceId,
+    userId,
+    role: 'assistant',
+    content: jsonResponse.reply || JSON.stringify(jsonResponse),
+    sources: jsonResponse.sources || []
+  });
+
+  return assistantMessage;
 };

@@ -13,9 +13,9 @@ const runResearcherAgent = async (tasks, researchQuestion, context = {}) => {
   let allRawData = [];
 
   // 1. Try real web search first
-  const isSimulated = !(process.env.SEARCH_API_KEY && process.env.SEARCH_API_URL);
+  const hasSearch = Boolean(process.env.SEARCH_API_KEY);
 
-  if (!isSimulated) {
+  if (hasSearch) {
     // Real Search - Run independently in parallel, limit to top 3 per task
     const uniqueQueries = new Set();
     const searchPromises = researcherTasks
