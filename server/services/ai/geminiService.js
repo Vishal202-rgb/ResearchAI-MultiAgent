@@ -28,7 +28,13 @@ const cleanAndParseJson = (content) => {
     try {
       return JSON.parse(match[0].trim());
     } catch (innerErr) {
-      // continue
+      // 4. Try basic repair of trailing commas or unclosed structures
+      try {
+        let repaired = match[0].trim().replace(/,\s*([}\]])/g, '$1');
+        return JSON.parse(repaired);
+      } catch (repairErr) {
+        // continue
+      }
     }
   }
 
@@ -45,7 +51,8 @@ const callGemini = async (prompt, options = {}) => {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const mimeType = options.responseMimeType || 'application/json';
-  const timeoutMs = options.timeoutMs || 45000;
+  // Default to 25s timeout to stay well within Vercel's 60s execution limit
+  const timeoutMs = options.timeoutMs || 25000;
 
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -56,8 +63,9 @@ const callGemini = async (prompt, options = {}) => {
     },
   };
 
-  let retries = options.retries !== undefined ? options.retries : 2;
-  let backoff = options.initialBackoffMs || 2000;
+  // Limit retries to 1 by default so that total duration never breaches serverless execution window
+  let retries = options.retries !== undefined ? options.retries : 1;
+  let backoff = options.initialBackoffMs || 1500;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -71,30 +79,36 @@ const callGemini = async (prompt, options = {}) => {
         signal: controller.signal,
       });
 
-      clearTimeout(timeout);
-
       if (!response.ok) {
         const errorText = await response.text();
 
-        // 429 Too Many Requests -> Exponential Backoff
-        if (response.status === 429 && attempt < retries) {
-          console.warn(`[Gemini API] 429 Too Many Requests. Retrying in ${backoff}ms (Attempt ${attempt + 1}/${retries})...`);
-          await delay(backoff);
-          backoff = Math.min(backoff * 2, 10000);
-          continue;
+        // Detect quota exhaustion - abort immediately to avoid hitting wall
+        const isQuota = response.status === 403 ||
+          (response.status === 429 && (
+            errorText.includes('Quota exceeded') ||
+            errorText.includes('free_tier_requests') ||
+            errorText.includes('RESOURCE_EXHAUSTED') ||
+            errorText.includes('billing')
+          ));
+
+        if (isQuota) {
+          console.error(`[Gemini API] Quota Exhausted (${response.status}). Aborting retries.`);
+          throw new Error(`Gemini Quota Exceeded: ${errorText}`);
         }
 
-        // 403 Forbidden / Quota -> Abort immediately to prevent aggressive retries when quota exhausted
-        if (response.status === 403) {
-          console.error(`[Gemini API] 403 Quota Exhausted/Forbidden. Aborting retries.`);
-          throw new Error(`Gemini Quota Exceeded or Forbidden: ${errorText}`);
+        // 429 Rate Limit (transient) -> Short backoff retry if attempts remain
+        if (response.status === 429 && attempt < retries) {
+          console.warn(`[Gemini API] 429 Rate Limited. Retrying in ${backoff}ms (Attempt ${attempt + 1}/${retries})...`);
+          await delay(backoff);
+          backoff = Math.min(backoff * 2, 4000);
+          continue;
         }
 
         // 5xx Server errors -> Retry if attempts remain
         if ([500, 502, 503, 504].includes(response.status) && attempt < retries) {
           console.warn(`[Gemini API] Server error ${response.status}. Retrying in ${backoff}ms (Attempt ${attempt + 1}/${retries})...`);
           await delay(backoff);
-          backoff = Math.min(backoff * 2, 10000);
+          backoff = Math.min(backoff * 2, 4000);
           continue;
         }
 
@@ -123,8 +137,6 @@ const callGemini = async (prompt, options = {}) => {
       return content;
 
     } catch (error) {
-      clearTimeout(timeout);
-
       const isAbort = error.name === 'AbortError';
       const errorMessage = isAbort ? `Gemini API request timed out after ${timeoutMs}ms` : error.message;
 
@@ -134,7 +146,9 @@ const callGemini = async (prompt, options = {}) => {
 
       console.warn(`[Gemini API] Error on attempt ${attempt + 1}: ${errorMessage}. Retrying in ${backoff}ms...`);
       await delay(backoff);
-      backoff = Math.min(backoff * 2, 10000);
+      backoff = Math.min(backoff * 2, 4000);
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

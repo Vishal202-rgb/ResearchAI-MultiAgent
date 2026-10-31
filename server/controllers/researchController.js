@@ -161,12 +161,19 @@ export const startRun = async (req, res, next) => {
     });
 
     if (existingRun) {
-      // If the running run is stale (> 5 minutes without completion), mark it failed
-      const isStale = (Date.now() - new Date(existingRun.updatedAt || existingRun.createdAt).getTime()) > 5 * 60 * 1000;
+      // If the running run is stale (> 90 seconds without completion), mark it failed
+      const isStale = (Date.now() - new Date(existingRun.updatedAt || existingRun.createdAt).getTime()) > 90 * 1000;
       if (isStale) {
         existingRun.status = 'failed';
         existingRun.error = 'Previous run timed out or was interrupted';
         existingRun.completedAt = new Date();
+        existingRun.agentStatuses.forEach((a) => {
+          if (a.status === 'running' || a.status === 'pending') {
+            a.status = 'failed';
+            a.error = 'Run timed out';
+            a.completedAt = new Date();
+          }
+        });
         await existingRun.save();
       } else {
         return next(new AppError('A research run is already in progress', 400));
@@ -205,17 +212,41 @@ export const getRun = async (req, res, next) => {
       userId: req.user._id,
     }).sort({ createdAt: -1 });
 
-    // If run is running and synthesizer is pending while fact_checker completed, resume synthesizer
+    // Handle stalled / pending synthesizer stage or timed-out runs
     if (run && run.status === 'running') {
       const factCheckerStatus = run.agentStatuses.find((a) => a.agent === 'fact_checker')?.status;
-      const synthesizerStatus = run.agentStatuses.find((a) => a.agent === 'synthesizer')?.status;
+      const synthesizerAgent = run.agentStatuses.find((a) => a.agent === 'synthesizer');
+      const synthesizerStatus = synthesizerAgent?.status;
+      const synthesizerStartedAt = synthesizerAgent?.startedAt;
 
-      if (factCheckerStatus === 'completed' && synthesizerStatus === 'pending') {
+      const isSynthesizerStalled =
+        (factCheckerStatus === 'completed' && synthesizerStatus === 'pending') ||
+        (synthesizerStatus === 'running' && synthesizerStartedAt && (Date.now() - new Date(synthesizerStartedAt).getTime() > 25000));
+
+      if (isSynthesizerStalled) {
+        console.log(`[Research Controller] Resuming stalled/pending synthesizer stage for run ${run._id}...`);
         try {
           await resumeSynthesizerStage(run._id, workspace._id);
           run = await ResearchRun.findById(run._id);
         } catch (resumeErr) {
           console.error(`[Research Controller] Failed to auto-resume synthesizer for run ${run._id}:`, resumeErr.message);
+        }
+      } else {
+        // Guard against any run that has been stalled overall (> 90 seconds)
+        const runAgeMs = Date.now() - new Date(run.startedAt || run.createdAt).getTime();
+        if (runAgeMs > 90000) {
+          console.warn(`[Research Controller] Run ${run._id} exceeded maximum duration (90s). Marking as failed.`);
+          run.status = 'failed';
+          run.error = 'Research execution timed out or was interrupted. Please retry.';
+          run.completedAt = new Date();
+          run.agentStatuses.forEach((a) => {
+            if (a.status === 'running' || a.status === 'pending') {
+              a.status = 'failed';
+              a.error = 'Execution timed out';
+              a.completedAt = new Date();
+            }
+          });
+          await run.save();
         }
       }
     }

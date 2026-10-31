@@ -4,7 +4,7 @@ import { FileText, Loader2, RefreshCw, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const ReportPanel = ({ workspaceId }) => {
+const ReportPanel = ({ workspaceId, runStatus }) => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -24,6 +24,12 @@ const ReportPanel = ({ workspaceId }) => {
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
+
+  useEffect(() => {
+    if (runStatus === 'completed') {
+      fetchReport();
+    }
+  }, [runStatus, fetchReport]);
 
   const handleGenerate = async () => {
     try {

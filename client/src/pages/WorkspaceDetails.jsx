@@ -427,7 +427,7 @@ const WorkspaceDetails = () => {
           {activeTab === 'documents' && <DocumentPanel workspaceId={id} />}
           {activeTab === 'graph' && <GraphPanel workspaceId={id} />}
           {activeTab === 'chat' && <ChatPanel workspaceId={id} />}
-          {activeTab === 'report' && <ReportPanel workspaceId={id} />}
+          {activeTab === 'report' && <ReportPanel workspaceId={id} runStatus={run?.status} />}
           {activeTab === 'timeline' && <TimelinePanel sources={sources} />}
           {activeTab === 'debate' && <DebatePanel workspaceId={id} results={results} onSaveInsight={handleSaveInsight} initialFinding={debateFinding} />}
           

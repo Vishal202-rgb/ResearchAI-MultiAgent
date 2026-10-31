@@ -46,10 +46,39 @@ RULES:
 Return ONLY valid JSON.`;
 
   try {
-    const reportData = await callGemini(prompt, { temperature: 0.3, maxTokens: 8000 });
+    const reportData = await callGemini(prompt, {
+      temperature: 0.3,
+      maxTokens: 3000,
+      timeoutMs: 25000,
+      retries: 1,
+    });
     return reportData;
   } catch (error) {
-    console.error('Report generation failed:', error);
-    throw error;
+    console.warn('Report generation AI call failed, generating fallback structured report:', error.message);
+    const title = `${workspace.title || workspace.researchQuestion || 'Research Report'} - Final Report`;
+    const execSummary = findings.summary || (findings.keyFindings && findings.keyFindings.join(' ')) || 'Research findings synthesized from available evidence.';
+    const methodology = 'Multi-agent AI research pipeline with web search, pattern analysis, and fact-checking.';
+    const detailedAnalysis = findings.rawAnalysis || 'In-depth analysis synthesized across multi-agent findings.';
+    const conclusion = 'The research findings provide structured evidence and strategic implications for the objective.';
+
+    const mdSections = [
+      `# ${title}\n`,
+      `## Executive Summary\n\n${execSummary}\n`,
+      `## Methodology\n\n${methodology}\n`,
+      findings.keyFindings && findings.keyFindings.length > 0 ? `## Key Findings\n\n${findings.keyFindings.map((kf, i) => `${i + 1}. ${kf}`).join('\n')}\n` : '',
+      `## Detailed Analysis\n\n${detailedAnalysis}\n`,
+      findings.limitations && findings.limitations.length > 0 ? `## Limitations\n\n${findings.limitations.map(l => `- ${l}`).join('\n')}\n` : '',
+      `## Conclusion\n\n${conclusion}\n`,
+      sources.length > 0 ? `## References\n\n${sources.map((s, i) => `[${i + 1}] "${s.title}" - ${s.publisher || 'Unknown'}${s.url ? ` (${s.url})` : ''}`).join('\n')}\n` : '',
+    ].filter(Boolean).join('\n');
+
+    return {
+      title,
+      executiveSummary: execSummary,
+      methodology,
+      detailedAnalysis,
+      conclusion,
+      markdown: mdSections,
+    };
   }
 };

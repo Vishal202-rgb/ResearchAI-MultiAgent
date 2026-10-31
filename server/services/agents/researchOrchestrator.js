@@ -16,6 +16,7 @@ const AGENTS = ['planner', 'researcher', 'analyst', 'fact_checker', 'synthesizer
 const updateAgentStatus = async (runId, agentName, status, error = '') => {
   const updateFields = {
     'agentStatuses.$[elem].status': status,
+    updatedAt: new Date(),
   };
   if (status === 'running') {
     updateFields['agentStatuses.$[elem].startedAt'] = new Date();
@@ -252,18 +253,23 @@ const runResearchPipeline = async (run, plan, workspace) => {
  * Atomically claims execution to prevent duplicate executions across polling requests.
  */
 export const resumeSynthesizerStage = async (runId, workspaceId) => {
+  // Allow claiming if synthesizer is pending, OR if it has been marked running for > 25 seconds (stalled/frozen)
+  const staleThreshold = new Date(Date.now() - 25 * 1000);
+
   const claimedRun = await ResearchRun.findOneAndUpdate(
     {
       _id: runId,
       status: 'running',
-      'agentStatuses': {
-        $elemMatch: { agent: 'synthesizer', status: 'pending' },
-      },
+      $or: [
+        { 'agentStatuses': { $elemMatch: { agent: 'synthesizer', status: 'pending' } } },
+        { 'agentStatuses': { $elemMatch: { agent: 'synthesizer', status: 'running', startedAt: { $lt: staleThreshold } } } },
+      ],
     },
     {
       $set: {
         'agentStatuses.$[elem].status': 'running',
         'agentStatuses.$[elem].startedAt': new Date(),
+        updatedAt: new Date(),
       },
     },
     {
@@ -273,7 +279,7 @@ export const resumeSynthesizerStage = async (runId, workspaceId) => {
   );
 
   if (!claimedRun) {
-    return;
+    return null;
   }
 
   console.log(`[Research Pipeline] Resuming synthesizer stage for run: ${runId}`);
