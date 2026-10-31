@@ -9,6 +9,7 @@ const researchService = {
   startRun: (workspaceId) => api.post(`/research/run/${workspaceId}`),
   getRun: (workspaceId) => api.get(`/research/run/${workspaceId}`),
   getResults: (workspaceId) => api.get(`/research/results/${workspaceId}`),
+  deepDive: (workspaceId, finding) => api.post(`/research/run/${workspaceId}/deep-dive`, { finding }),
 };
 
 export default researchService;
